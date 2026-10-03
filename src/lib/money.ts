@@ -60,3 +60,31 @@ export function splitPeriodAmount(monthlyCents: number, cutoffIndex: number, cut
 export function semiMonthly(monthlyCents: number, isSecondCutoff: boolean): number {
   return splitPeriodAmount(monthlyCents, isSecondCutoff ? 1 : 0, 2);
 }
+
+const PHP = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  minimumFractionDigits: 2,
+});
+
+/** 1234567 -> "₱12,345.67" */
+export function formatPhp(cents: number): string {
+  return PHP.format(cents / 100);
+}
+
+/** "₱12,345.67" / "12345.67" -> 1234567. Returns null when unparseable. */
+export function parsePhpToCents(input: string): number | null {
+  const cleaned = input.replace(/[,\s₱]/g, "");
+  if (!/^-?\d{1,15}(\.\d{1,2})?$/.test(cleaned)) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? roundHalfUp(value * 100) : null;
+}
+
+/** "2026-01-31" -> "January 31, 2026" */
+export function formatDate(iso: string): string {
+  if (!iso) return "—";
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "UTC" }).format(d);
+}
+

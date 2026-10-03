@@ -83,6 +83,11 @@ async function main() {
   const emp = await req("/employees");
   assert(emp.status === 200, `ADMIN can open /employees (${emp.status})`);
 
+  for (const path of ["/setup", "/employees/new", "/employees?q=mark"]) {
+    const res = await req(path);
+    assert(res.status === 200, `GET ${path} renders (${res.status})`);
+  }
+
   console.log("\nAll auth checks passed.");
 }
 

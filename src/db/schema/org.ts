@@ -47,6 +47,8 @@ export const payFrequency = pgEnum("pay_frequency", [
 
 export const userRole = pgEnum("user_role", ["ADMIN", "HR", "PAYROLL", "EMPLOYEE"]);
 
+export type UserRole = (typeof userRole.enumValues)[number];
+
 export const users = pgTable(
   "users",
   {

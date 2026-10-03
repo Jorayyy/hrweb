@@ -1,7 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
+import { cn } from "cn";
 import type { employee as employeeSchema } from "@/db/schema";
+import { Field, FormSection, inputCx, selectCx } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { FormState } from "@/lib/form";
 
 type Initial = typeof employeeSchema.$inferSelect;
@@ -15,41 +19,8 @@ type Selects = {
   managers: Option[];
 };
 
-const input =
-  "mt-1 w-full rounded-md border px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500 border-zinc-300";
-const inputErr = "mt-1 w-full rounded-md border border-red-400 px-2.5 py-1.5 text-sm outline-none";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function Field({
-  label,
-  name,
-  error,
-  children,
-  className,
-}: {
-  label: string;
-  name: string;
-  error?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label htmlFor={name} className={`block text-xs font-medium text-zinc-600 ${className ?? ""}`}>
-      {label}
-      {children}
-      {error ? <span className="mt-0.5 block text-red-600">{error}</span> : null}
-    </label>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <fieldset className="border-t border-zinc-200 pt-5">
-      <legend className="pr-3 text-sm font-semibold text-zinc-900">{title}</legend>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
-    </fieldset>
-  );
-}
+const invalidCx = "border-destructive ring-3 ring-destructive/20";
 
 export function EmployeeForm({
   action,
@@ -70,19 +41,40 @@ export function EmployeeForm({
 
   const text = (name: keyof Initial): string => {
     const value = v?.[name];
-    if (value === null || value === undefined) return "";
-    return String(value);
+    return value === null || value === undefined ? "" : String(value);
   };
+  const invalid = (name: string) => (errors[name] ? true : undefined);
+  const cx = (name: string, kind: "input" | "select" = "input") =>
+    cn(kind === "select" ? selectCx : inputCx, errors[name] && invalidCx);
+
   const money = v ? (v.baseSalaryMonthly / 100).toFixed(2) : "";
   const restDays = new Set(v?.weeklyRestDays ?? []);
-
   const summary = Object.entries(errors);
-  const cls = (name: string) => (errors[name] ? inputErr : input);
+
+  const selectField = (name: string, label: string, options: Option[]) => (
+    <Field name={name} label={label} error={errors[name]}>
+      <select
+        id={name}
+        name={name}
+        required
+        defaultValue={text(name as keyof Initial)}
+        className={cx(name, "select")}
+        aria-invalid={invalid(name)}
+      >
+        {!text(name as keyof Initial) && <option value="">Select…</option>}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
 
   return (
     <form action={formAction} className="space-y-6">
       {summary.length > 0 ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <p className="font-medium">Fix the following:</p>
           <ul className="mt-1 list-disc pl-5">
             {summary.map(([name, message]) => (
@@ -92,59 +84,106 @@ export function EmployeeForm({
         </div>
       ) : null}
 
-      <Section title="Identity">
-        <Field label="Employee no." name="employeeNo" error={errors.employeeNo}>
-          <input name="employeeNo" required defaultValue={text("employeeNo")} className={cls("employeeNo")} />
+      <FormSection title="Identity">
+        <Field name="employeeNo" label="Employee no." error={errors.employeeNo}>
+          <Input
+            id="employeeNo"
+            name="employeeNo"
+            required
+            defaultValue={text("employeeNo")}
+            className={cx("employeeNo")}
+            aria-invalid={invalid("employeeNo")}
+          />
         </Field>
-        <Field
-          label="Biometric code"
-          name="externalCode"
-          error={errors.externalCode}
-        >
-          <input name="externalCode" required defaultValue={text("externalCode")} className={cls("externalCode")} />
+        <Field name="externalCode" label="Biometric code" error={errors.externalCode}>
+          <Input
+            id="externalCode"
+            name="externalCode"
+            required
+            defaultValue={text("externalCode")}
+            placeholder="Echoed by the time clock"
+            className={cx("externalCode")}
+            aria-invalid={invalid("externalCode")}
+          />
         </Field>
-        <Field label="Email" name="email" error={errors.email}>
-          <input name="email" type="email" defaultValue={text("email")} className={cls("email")} />
+        <Field name="email" label="Email" error={errors.email}>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            defaultValue={text("email")}
+            className={cx("email")}
+            aria-invalid={invalid("email")}
+          />
         </Field>
-        <Field label="First name" name="firstName" error={errors.firstName}>
-          <input name="firstName" required defaultValue={text("firstName")} className={cls("firstName")} />
+        <Field name="firstName" label="First name" error={errors.firstName}>
+          <Input
+            id="firstName"
+            name="firstName"
+            required
+            defaultValue={text("firstName")}
+            className={cx("firstName")}
+            aria-invalid={invalid("firstName")}
+          />
         </Field>
-        <Field label="Middle name" name="middleName" error={errors.middleName}>
-          <input name="middleName" defaultValue={text("middleName")} className={cls("middleName")} />
+        <Field name="middleName" label="Middle name" error={errors.middleName}>
+          <Input
+            id="middleName"
+            name="middleName"
+            defaultValue={text("middleName")}
+            className={cx("middleName")}
+          />
         </Field>
-        <Field label="Last name" name="lastName" error={errors.lastName}>
-          <input name="lastName" required defaultValue={text("lastName")} className={cls("lastName")} />
+        <Field name="lastName" label="Last name" error={errors.lastName}>
+          <Input
+            id="lastName"
+            name="lastName"
+            required
+            defaultValue={text("lastName")}
+            className={cx("lastName")}
+            aria-invalid={invalid("lastName")}
+          />
         </Field>
-      </Section>
+      </FormSection>
 
-      <Section title="Employment">
-        <Field label="Date hired" name="dateHired" error={errors.dateHired}>
-          <input
+      <FormSection title="Employment">
+        <Field name="dateHired" label="Date hired" error={errors.dateHired}>
+          <Input
+            id="dateHired"
             name="dateHired"
             type="date"
             required
             defaultValue={text("dateHired")}
-            className={cls("dateHired")}
+            className={cx("dateHired")}
+            aria-invalid={invalid("dateHired")}
           />
         </Field>
-        <Field label="Date regularized" name="dateRegularized" error={errors.dateRegularized}>
-          <input
+        <Field name="dateRegularized" label="Date regularized" error={errors.dateRegularized}>
+          <Input
+            id="dateRegularized"
             name="dateRegularized"
             type="date"
             defaultValue={text("dateRegularized")}
-            className={cls("dateRegularized")}
+            className={cx("dateRegularized")}
           />
         </Field>
-        <Field label="Date separated" name="dateSeparated" error={errors.dateSeparated}>
-          <input
+        <Field name="dateSeparated" label="Date separated" error={errors.dateSeparated}>
+          <Input
+            id="dateSeparated"
             name="dateSeparated"
             type="date"
             defaultValue={text("dateSeparated")}
-            className={cls("dateSeparated")}
+            className={cx("dateSeparated")}
           />
         </Field>
-        <Field label="Status" name="status" error={errors.status}>
-          <select name="status" required defaultValue={text("status") || "ACTIVE"} className={cls("status")}>
+        <Field name="status" label="Status" error={errors.status}>
+          <select
+            id="status"
+            name="status"
+            required
+            defaultValue={text("status") || "ACTIVE"}
+            className={cx("status", "select")}
+          >
             {enums.status.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -152,12 +191,13 @@ export function EmployeeForm({
             ))}
           </select>
         </Field>
-        <Field label="Employment type" name="employmentType" error={errors.employmentType}>
+        <Field name="employmentType" label="Employment type" error={errors.employmentType}>
           <select
+            id="employmentType"
             name="employmentType"
             required
             defaultValue={text("employmentType") || "REGULAR"}
-            className={cls("employmentType")}
+            className={cx("employmentType", "select")}
           >
             {enums.employmentType.map((o) => (
               <option key={o.value} value={o.value}>
@@ -166,12 +206,13 @@ export function EmployeeForm({
             ))}
           </select>
         </Field>
-        <Field label="Pay frequency" name="payFrequency" error={errors.payFrequency}>
+        <Field name="payFrequency" label="Pay frequency" error={errors.payFrequency}>
           <select
+            id="payFrequency"
             name="payFrequency"
             required
             defaultValue={text("payFrequency") || "SEMI_MONTHLY"}
-            className={cls("payFrequency")}
+            className={cx("payFrequency", "select")}
           >
             {enums.payFrequency.map((o) => (
               <option key={o.value} value={o.value}>
@@ -180,59 +221,20 @@ export function EmployeeForm({
             ))}
           </select>
         </Field>
-      </Section>
+      </FormSection>
 
-      <Section title="Assignment">
-        <Field label="Campaign" name="campaignId" error={errors.campaignId}>
-          <select name="campaignId" required defaultValue={text("campaignId")} className={cls("campaignId")}>
-            <option value="" disabled>
-              Select…
-            </option>
-            {selects.campaigns.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Department" name="departmentId" error={errors.departmentId}>
-          <select name="departmentId" required defaultValue={text("departmentId")} className={cls("departmentId")}>
-            <option value="" disabled>
-              Select…
-            </option>
-            {selects.departments.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Cost center" name="costCenterId" error={errors.costCenterId}>
-          <select name="costCenterId" required defaultValue={text("costCenterId")} className={cls("costCenterId")}>
-            <option value="" disabled>
-              Select…
-            </option>
-            {selects.costCenters.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Position" name="positionId" error={errors.positionId}>
-          <select name="positionId" required defaultValue={text("positionId")} className={cls("positionId")}>
-            <option value="" disabled>
-              Select…
-            </option>
-            {selects.positions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Reports to" name="reportsToId" error={errors.reportsToId}>
-          <select name="reportsToId" defaultValue={text("reportsToId")} className={cls("reportsToId")}>
+      <FormSection title="Assignment" description="Reporting line and cost attribution.">
+        {selectField("campaignId", "Campaign", selects.campaigns)}
+        {selectField("departmentId", "Department", selects.departments)}
+        {selectField("costCenterId", "Cost center", selects.costCenters)}
+        {selectField("positionId", "Position", selects.positions)}
+        <Field name="reportsToId" label="Reports to" error={errors.reportsToId}>
+          <select
+            id="reportsToId"
+            name="reportsToId"
+            defaultValue={text("reportsToId")}
+            className={cx("reportsToId", "select")}
+          >
             <option value="">— None —</option>
             {selects.managers.map((o) => (
               <option key={o.value} value={o.value}>
@@ -241,31 +243,31 @@ export function EmployeeForm({
             ))}
           </select>
         </Field>
-      </Section>
+      </FormSection>
 
-      <Section title="Pay">
-        <Field
-          label="Monthly basic salary (PHP)"
-          name="baseSalaryMonthly"
-          error={errors.baseSalaryMonthly}
-          className="sm:col-span-1"
-        >
-          <input
+      <FormSection
+        title="Pay"
+        description="Daily rate = monthly ÷ 22; hourly rate = daily ÷ 8 (DOLE)."
+      >
+        <Field name="baseSalaryMonthly" label="Monthly basic salary (PHP)" error={errors.baseSalaryMonthly}>
+          <Input
+            id="baseSalaryMonthly"
             name="baseSalaryMonthly"
             required
             inputMode="decimal"
             placeholder="18000.00"
             defaultValue={money}
-            className={cls("baseSalaryMonthly")}
+            className={cx("baseSalaryMonthly")}
+            aria-invalid={invalid("baseSalaryMonthly")}
           />
         </Field>
-        <div className="flex items-end gap-6 pb-1 text-sm">
+        <div className="flex flex-wrap items-end gap-6 pb-1.5 text-sm sm:col-span-2">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
               name="isMinimumWageExempt"
               defaultChecked={v?.isMinimumWageExempt}
-              className="size-4 accent-zinc-900"
+              className="size-4 accent-primary"
             />
             Minimum-wage exempt
           </label>
@@ -274,34 +276,47 @@ export function EmployeeForm({
               type="checkbox"
               name="isManagerialTaxTbl"
               defaultChecked={v?.isManagerialTaxTbl}
-              className="size-4 accent-zinc-900"
+              className="size-4 accent-primary"
             />
             Managerial tax table
           </label>
         </div>
-      </Section>
+      </FormSection>
 
-      <Section title="Statutory numbers">
-        <Field label="TIN" name="tinNo" error={errors.tinNo}>
-          <input name="tinNo" defaultValue={text("tinNo")} className={cls("tinNo")} />
+      <FormSection title="Statutory numbers" description="Used on the monthly BIR and SSS reports.">
+        <Field name="tinNo" label="TIN" error={errors.tinNo}>
+          <Input id="tinNo" name="tinNo" defaultValue={text("tinNo")} className={cx("tinNo")} />
         </Field>
-        <Field label="SSS no." name="sssNo" error={errors.sssNo}>
-          <input name="sssNo" defaultValue={text("sssNo")} className={cls("sssNo")} />
+        <Field name="sssNo" label="SSS no." error={errors.sssNo}>
+          <Input id="sssNo" name="sssNo" defaultValue={text("sssNo")} className={cx("sssNo")} />
         </Field>
-        <Field label="PhilHealth no." name="philhealthNo" error={errors.philhealthNo}>
-          <input name="philhealthNo" defaultValue={text("philhealthNo")} className={cls("philhealthNo")} />
+        <Field name="philhealthNo" label="PhilHealth no." error={errors.philhealthNo}>
+          <Input
+            id="philhealthNo"
+            name="philhealthNo"
+            defaultValue={text("philhealthNo")}
+            className={cx("philhealthNo")}
+          />
         </Field>
-        <Field label="Pag-IBIG no." name="pagibigNo" error={errors.pagibigNo}>
-          <input name="pagibigNo" defaultValue={text("pagibigNo")} className={cls("pagibigNo")} />
+        <Field name="pagibigNo" label="Pag-IBIG no." error={errors.pagibigNo}>
+          <Input
+            id="pagibigNo"
+            name="pagibigNo"
+            defaultValue={text("pagibigNo")}
+            className={cx("pagibigNo")}
+          />
         </Field>
-        <Field label="RDO code" name="rdoCode" error={errors.rdoCode}>
-          <input name="rdoCode" defaultValue={text("rdoCode")} className={cls("rdoCode")} />
+        <Field name="rdoCode" label="RDO code" error={errors.rdoCode}>
+          <Input id="rdoCode" name="rdoCode" defaultValue={text("rdoCode")} className={cx("rdoCode")} />
         </Field>
-      </Section>
+      </FormSection>
 
-      <fieldset className="border-t border-zinc-200 pt-5">
-        <legend className="pr-3 text-sm font-semibold text-zinc-900">Weekly rest days</legend>
-        <div className="mt-3 flex flex-wrap gap-4">
+      <section className="border-t border-border pt-5">
+        <h2 className="text-sm font-semibold">Weekly rest days</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Rest-day premiums apply to hours worked on these days.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-4">
           {DAYS.map((day, index) => (
             <label key={day} className="flex items-center gap-2 text-sm">
               <input
@@ -309,25 +324,21 @@ export function EmployeeForm({
                 name="weeklyRestDays"
                 value={String(index)}
                 defaultChecked={restDays.has(index)}
-                className="size-4 accent-zinc-900"
+                className="size-4 accent-primary"
               />
               {day}
             </label>
           ))}
         </div>
         {errors.weeklyRestDays ? (
-          <p className="mt-1 text-sm text-red-600">{errors.weeklyRestDays}</p>
+          <p className="mt-2 text-xs text-destructive">{errors.weeklyRestDays}</p>
         ) : null}
-      </fieldset>
+      </section>
 
-      <div className="flex justify-end border-t border-zinc-200 pt-5">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60"
-        >
+      <div className="flex justify-end border-t border-border pt-5">
+        <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : submitLabel}
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -1,6 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field, selectCx } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import type { FormState } from "@/lib/form";
 
 export type ReferenceField = {
@@ -26,72 +29,72 @@ export function ReferenceForm({
   const errors = state?.errors ?? {};
 
   return (
-    <form action={formAction} className="border-b border-zinc-200 bg-zinc-50 px-5 py-4">
-      <div className="flex flex-wrap items-end gap-3">
-        {fields.map((f) => {
-          const error = errors[f.name];
-          const base =
-            "mt-1 w-full rounded-md border px-2.5 py-1.5 text-sm outline-none focus:border-zinc-500 " +
-            (error ? "border-red-400" : "border-zinc-300");
-
-          if (f.type === "checkbox") {
-            return (
-              <label key={f.name} className="flex items-center gap-2 pb-2 text-sm">
-                <input
-                  type="checkbox"
-                  name={f.name}
-                  className="size-4 accent-zinc-900"
-                  defaultChecked={f.defaultChecked}
-                />
-                {f.label}
-              </label>
-            );
-          }
-
-          if (f.type === "select") {
-            return (
-              <label key={f.name} className="min-w-44 flex-1 text-xs font-medium text-zinc-600">
-                {f.label}
-                <select name={f.name} required={f.required} defaultValue="" className={base}>
-                  <option value="" disabled>
-                    {f.placeholder ?? "Select…"}
-                  </option>
-                  {f.options?.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                {error ? <span className="mt-0.5 block text-red-600">{error}</span> : null}
-              </label>
-            );
-          }
-
+    <form
+      action={formAction}
+      className="flex flex-wrap items-end gap-3 border-b border-border bg-muted/40 px-4 py-3"
+    >
+      {fields.map((field) => {
+        if (field.type === "checkbox") {
           return (
-            <label key={f.name} className="min-w-32 flex-1 text-xs font-medium text-zinc-600">
-              {f.label}
+            <label key={field.name} className="flex items-center gap-2 pb-1.5 text-sm">
               <input
-                type={f.type === "number" ? "number" : "text"}
-                name={f.name}
-                required={f.required}
-                placeholder={f.placeholder}
-                className={base}
+                type="checkbox"
+                name={field.name}
+                defaultChecked={field.defaultChecked}
+                className="size-4 accent-primary"
               />
-              {error ? <span className="mt-0.5 block text-red-600">{error}</span> : null}
+              {field.label}
             </label>
           );
-        })}
+        }
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60"
-        >
-          {pending ? "Saving…" : submitLabel}
-        </button>
-      </div>
+        return (
+          <Field
+            key={field.name}
+            name={field.name}
+            label={field.label}
+            error={errors[field.name]}
+            className="min-w-36 flex-1"
+          >
+            {field.type === "select" ? (
+              <select
+                id={field.name}
+                name={field.name}
+                required={field.required}
+                defaultValue=""
+                className={selectCx}
+                aria-invalid={Boolean(errors[field.name])}
+              >
+                <option value="" disabled>
+                  {field.placeholder ?? "Select…"}
+                </option>
+                {field.options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                id={field.name}
+                name={field.name}
+                type={field.type === "number" ? "number" : "text"}
+                required={field.required}
+                placeholder={field.placeholder}
+                aria-invalid={Boolean(errors[field.name])}
+              />
+            )}
+          </Field>
+        );
+      })}
 
-      {state?.error ? <p className="mt-2 text-sm text-red-600">{state.error}</p> : null}
+      <Button type="submit" size="sm" disabled={pending} className="h-8">
+        {pending ? "Saving…" : submitLabel}
+      </Button>
+
+      {state?.error ? (
+        <p className="w-full text-xs text-destructive">{state.error}</p>
+      ) : null}
     </form>
   );
 }

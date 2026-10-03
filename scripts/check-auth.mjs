@@ -77,8 +77,9 @@ async function main() {
   const home = await req("/");
   assert(home.status === 200, `authenticated / renders (${home.status})`);
   const homeHtml = await home.text();
-  assert(homeHtml.includes("Welcome"), "dashboard renders for signed-in user");
-  assert(homeHtml.includes("Sign out"), "sidebar renders sign out");
+  assert(homeHtml.includes("Active headcount"), "dashboard renders for signed-in user");
+  assert(homeHtml.includes("Signed in as ADMIN"), "signed-in role shown in header");
+  assert(homeHtml.includes('href="/payroll"'), "sidebar renders role-gated nav");
 
   const emp = await req("/employees");
   assert(emp.status === 200, `ADMIN can open /employees (${emp.status})`);

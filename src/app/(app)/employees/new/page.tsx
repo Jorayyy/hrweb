@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { EmployeeForm } from "@/components/employee-form";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createEmployee } from "../actions";
 import { ENUM_OPTIONS, employeeSelects } from "../queries";
 
@@ -17,36 +20,45 @@ export default async function NewEmployeePage() {
 
   if (missing.length > 0) {
     return (
-      <div className="mx-auto max-w-3xl px-8 py-10">
-        <h1 className="text-2xl font-semibold">Add employee</h1>
-        <div className="mt-6 rounded-lg border border-dashed border-zinc-300 bg-white p-8 text-center">
-          <p className="text-sm text-zinc-600">
-            Create these first: <span className="font-medium">{missing.join(", ")}.</span>
-          </p>
-          <Link
-            href="/setup"
-            className="mt-4 inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-          >
-            Go to setup
-          </Link>
-        </div>
-      </div>
+      <>
+        <PageHeader title="Add employee" />
+        <PageBody>
+          <Card className="mx-auto max-w-2xl border-dashed">
+            <CardHeader>
+              <CardTitle>Set up the organization first</CardTitle>
+              <CardDescription>
+                Create these before adding employees:{" "}
+                <span className="font-medium text-foreground">{missing.join(", ")}.</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/setup">Go to setup</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </PageBody>
+      </>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-10">
-      <h1 className="text-2xl font-semibold">Add employee</h1>
-      <p className="mt-1 text-sm text-zinc-500">Daily rate is derived as monthly ÷ 22, hourly as daily ÷ 8.</p>
-
-      <div className="mt-8">
-        <EmployeeForm
-          action={createEmployee}
-          selects={selects}
-          enums={ENUM_OPTIONS}
-          submitLabel="Create employee"
-        />
-      </div>
-    </div>
+    <>
+      <PageHeader title="Add employee" description="Daily rate = monthly ÷ 22, hourly = daily ÷ 8." />
+      <PageBody>
+        <div className="mx-auto max-w-4xl">
+          <Card>
+            <CardContent className="pt-6">
+              <EmployeeForm
+                action={createEmployee}
+                selects={selects}
+                enums={ENUM_OPTIONS}
+                submitLabel="Create employee"
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </PageBody>
+    </>
   );
 }

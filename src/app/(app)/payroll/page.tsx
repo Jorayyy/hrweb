@@ -1,17 +1,30 @@
 import { requireRole } from "@/lib/auth";
+import { PageBody, PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function PayrollPage() {
   await requireRole("ADMIN", "PAYROLL");
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-10">
-      <h1 className="text-2xl font-semibold">Payroll</h1>
-      <p className="mt-1 text-sm text-zinc-500">
-        Periods, cutoff runs, registers and payslips.
-      </p>
-      <div className="mt-8 rounded-lg border border-dashed border-zinc-300 bg-white p-10 text-center text-sm text-zinc-500">
-        The engine is tested and seeded; the run screen comes next.
-      </div>
-    </div>
+    <>
+      <PageHeader
+        title="Payroll"
+        description="Periods, cutoff runs, registers and payslips"
+      />
+      <PageBody>
+        <Card className="mx-auto max-w-2xl border-dashed">
+          <CardHeader>
+            <CardTitle>The engine is ready — the run screen comes next</CardTitle>
+            <CardDescription>
+              Statutory tables (SSS, PhilHealth, Pag-IBIG, BIR TRAIN) are seeded and covered by tests.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Expected here: cutoff selection, gross-to-net computation, contribution reports, and
+            payslip export.
+          </CardContent>
+        </Card>
+      </PageBody>
+    </>
   );
 }

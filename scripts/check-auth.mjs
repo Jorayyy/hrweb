@@ -71,6 +71,9 @@ async function main() {
 
   const good = await post({ email: EMAIL, password: PASSWORD });
   assert(good.status >= 300 && good.status < 400, `credentials post responded (${good.status})`);
+  const loc = good.headers.get("location") ?? "";
+  const locHost = loc ? new URL(loc, BASE).host : new URL(BASE).host;
+  assert(locHost === new URL(BASE).host, `login redirect stays on this host (${loc || "relative"})`);
   const hasSession = [...jar.keys()].some((k) => k.includes("session-token"));
   assert(hasSession, "correct password sets session cookie");
 

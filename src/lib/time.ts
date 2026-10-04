@@ -56,6 +56,7 @@ export function nightOverlapSeconds(
   if (endMs <= startMs) return 0;
 
   let total = 0;
+  const bands: [number, number][] = [];
   const { year, monthIndex, day } = manilaParts(startMs);
   // Walk Manila calendar days forward from the start date.
   let cursor = Date.UTC(year, monthIndex, day);
@@ -68,15 +69,21 @@ export function nightOverlapSeconds(
 
     const lo = Math.max(startMs, bandStart);
     const hi = Math.min(endMs, bandEnd);
-    if (lo < hi) total += (hi - lo) / 1000;
+    if (lo < hi) {
+      bands.push([lo, hi]);
+      total += (hi - lo) / 1000;
+    }
 
     cursor += DAY_MS;
   }
 
+  // Only meals that fall INSIDE a night band reduce night seconds.
   for (const [mealStart, mealEnd] of mealWindowsMs) {
-    const lo = Math.max(startMs, mealStart);
-    const hi = Math.min(endMs, mealEnd);
-    if (lo < hi) total -= (hi - lo) / 1000;
+    for (const [bandStart, bandEnd] of bands) {
+      const lo = Math.max(mealStart, bandStart);
+      const hi = Math.min(mealEnd, bandEnd);
+      if (lo < hi) total -= (hi - lo) / 1000;
+    }
   }
 
   return Math.max(0, Math.round(total));

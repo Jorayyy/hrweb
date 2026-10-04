@@ -3,12 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
-import { attendanceDay, attendanceStatus, employee, holidayCalendar } from "@/db/schema";
+import {
+  attendanceDay,
+  attendanceStatus,
+  employee,
+  holidayCalendar,
+  shiftTemplate,
+} from "@/db/schema";
+import { computeDay, type PunchSet } from "@/lib/attendance/compute";
 import { requireRole } from "@/lib/auth";
 import { field, isIsoDate, oneOf, type FormState } from "@/lib/form";
-import { manilaDateKey, manilaDayOfWeek, manilaToUtc, nightOverlapSeconds } from "@/lib/time";
+import { manilaDayOfWeek, manilaToUtc, nightOverlapSeconds } from "@/lib/time";
 
-const RULE_VERSION = "att-2026.1";
+const RULE_VERSION = "att-2026.2";
 const DAY_MS = 86_400_000;
 const START_HOUR = 8;
 
@@ -25,15 +32,27 @@ function utcAt(workDate: string, hhmm: string): number {
   return manilaToUtc(y, m - 1, d, h, min);
 }
 
+const PUNCH_FIELDS = [
+  "punchIn",
+  "break1Out",
+  "break1In",
+  "lunchOut",
+  "lunchIn",
+  "break2Out",
+  "break2In",
+  "punchOut",
+] as const;
+
 export async function saveAttendanceDay(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireRole("ADMIN", "HR");
 
   const employeeId = Number(field(formData, "employeeId")) || null;
   const workDate = field(formData, "workDate");
   const status = field(formData, "status");
-  const punchIn = field(formData, "punchIn");
-  const punchOut = field(formData, "punchOut");
   const hoursRaw = Number(field(formData, "scheduledHours") || "8");
+  const times = Object.fromEntries(
+    PUNCH_FIELDS.map((name) => [name, field(formData, name)]),
+  ) as Record<(typeof PUNCH_FIELDS)[number], string>;
 
   const errors: Record<string, string> = {};
   if (!employeeId) errors.employeeId = "Employee is required.";
@@ -41,61 +60,108 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
   if (!oneOf(status, attendanceStatus.enumValues)) errors.status = "Unknown status.";
   if (!Number.isFinite(hoursRaw) || hoursRaw <= 0 || hoursRaw > 24)
     errors.scheduledHours = "Hours must be between 0 and 24.";
-  const needsPunch = oneOf(status, attendanceStatus.enumValues) && PUNCHED.includes(status as Status);
-  if (needsPunch) {
-    if (!TIME.test(punchIn) || !TIME.test(punchOut)) {
-      errors.punchIn = "Punch in and out are required for this status.";
-    }
+  for (const name of PUNCH_FIELDS) {
+    if (times[name] && !TIME.test(times[name])) errors[name] = "Use HH:MM.";
   }
-  if (!needsPunch && status !== "INCOMPLETE_PUNCH") {
-    if (punchIn && !TIME.test(punchIn)) errors.punchIn = "Use HH:MM.";
-    if (punchOut && !TIME.test(punchOut)) errors.punchOut = "Use HH:MM.";
+  const needsPunch = oneOf(status, attendanceStatus.enumValues) && PUNCHED.includes(status as Status);
+  if (needsPunch && (!TIME.test(times.punchIn) || !TIME.test(times.punchOut))) {
+    errors.punchIn = "Punch in and out are required for this status.";
   }
   if (Object.keys(errors).length > 0) return { errors };
 
-  const emp = await db
-    .select({ id: employee.id, weeklyRestDays: employee.weeklyRestDays })
+  const [emp] = await db
+    .select({ id: employee.id, weeklyRestDays: employee.weeklyRestDays, shiftTemplateId: employee.shiftTemplateId })
     .from(employee)
     .where(eq(employee.id, employeeId as number))
     .limit(1);
-  if (emp.length === 0) return { errors: { employeeId: "Employee not found." } };
+  if (!emp) return { errors: { employeeId: "Employee not found." } };
 
-  const scheduledSeconds = Math.round(hoursRaw * 3600);
-  const startMs = utcAt(workDate, `${String(START_HOUR).padStart(2, "0")}:00`);
+  const shift = emp.shiftTemplateId
+    ? ((await db
+        .select()
+        .from(shiftTemplate)
+        .where(eq(shiftTemplate.id, emp.shiftTemplateId))
+        .limit(1))[0] ?? null)
+    : null;
 
-  let punchInUtc: Date | null = null;
+  const inMs = times.punchIn ? utcAt(workDate, times.punchIn) : null;
+  const roll = (hhmm: string): Date | null => {
+    if (!hhmm) return null;
+    let ms = utcAt(workDate, hhmm);
+    if (inMs !== null) while (ms < inMs) ms += DAY_MS;
+    return new Date(ms);
+  };
+
+  const punchInUtc: Date | null = inMs !== null ? new Date(inMs) : null;
   let punchOutUtc: Date | null = null;
+  const break1OutUtc = roll(times.break1Out);
+  const break1InUtc = roll(times.break1In);
+  const lunchOutUtc = roll(times.lunchOut);
+  const lunchInUtc = roll(times.lunchIn);
+  const break2OutUtc = roll(times.break2Out);
+  const break2InUtc = roll(times.break2In);
+
+  let scheduledSeconds = Math.round(hoursRaw * 3600);
   let workedSeconds = 0;
   let lateSeconds = 0;
   let undertimeSeconds = 0;
   let otSeconds = 0;
   let nightSeconds = 0;
   let nightOtSeconds = 0;
+  let paidBreakSeconds = 0;
+  let computedNote: string | null = null;
 
-  const hasIn = TIME.test(punchIn);
-  const hasOut = TIME.test(punchOut);
-
-  if (hasIn) {
-    const inMs = utcAt(workDate, punchIn);
-    let outMs = hasOut ? utcAt(workDate, punchOut) : 0;
-    if (hasOut && outMs <= inMs) outMs += DAY_MS;
-
-    punchInUtc = new Date(inMs);
-    if (hasOut) {
+  if (shift) {
+    if (times.punchOut) {
+      let outMs = utcAt(workDate, times.punchOut);
+      while (inMs !== null && outMs <= inMs) outMs += DAY_MS;
       punchOutUtc = new Date(outMs);
-      workedSeconds = Math.max(0, Math.round((outMs - inMs) / 1000));
-      lateSeconds = Math.max(0, Math.round((inMs - startMs) / 1000));
+    }
+    const punches: PunchSet = {
+      inUtc: punchInUtc,
+      break1OutUtc,
+      break1InUtc,
+      lunchOutUtc,
+      lunchInUtc,
+      break2OutUtc,
+      break2InUtc,
+      outUtc: punchOutUtc,
+    };
+    const c = computeDay(workDate, shift, punches);
+    scheduledSeconds = c.scheduledSeconds;
+    workedSeconds = c.workedSeconds;
+    lateSeconds = c.lateSeconds;
+    undertimeSeconds = c.undertimeSeconds;
+    otSeconds = c.otWorkedSeconds;
+    nightSeconds = c.nightSeconds;
+    nightOtSeconds = c.nightOtSeconds;
+    paidBreakSeconds = c.paidBreakSeconds;
+    computedNote = c.reviewNote;
+  } else {
+    // No shift assigned — legacy in/out math against the manual schedule hours.
+    const startMs = utcAt(workDate, `${String(START_HOUR).padStart(2, "0")}:00`);
+    const hasIn = inMs !== null;
+    if (hasIn && times.punchOut) {
+      let outMs = utcAt(workDate, times.punchOut);
+      if (outMs <= (inMs as number)) outMs += DAY_MS;
+      punchOutUtc = new Date(outMs);
+      workedSeconds = Math.max(0, Math.round((outMs - (inMs as number)) / 1000));
+      lateSeconds = Math.max(0, Math.round(((inMs as number) - startMs) / 1000));
       undertimeSeconds = Math.max(0, scheduledSeconds - workedSeconds);
       otSeconds = Math.max(0, workedSeconds - scheduledSeconds);
-      nightSeconds = nightOverlapSeconds(inMs, outMs);
+      nightSeconds = nightOverlapSeconds(inMs as number, outMs);
       if (otSeconds > 0) {
-        nightOtSeconds = nightOverlapSeconds(Math.max(startMs + scheduledSeconds * 1000, inMs), outMs);
+        nightOtSeconds = nightOverlapSeconds(
+          Math.max(startMs + scheduledSeconds * 1000, inMs as number),
+          outMs,
+        );
       }
     }
   }
 
-  const dow = manilaDayOfWeek(startMs);
-  const isRestDay = emp[0].weeklyRestDays.includes(dow);
+  const dayAnchorMs = utcAt(workDate, "12:00");
+  const dow = manilaDayOfWeek(dayAnchorMs);
+  const isRestDay = emp.weeklyRestDays.includes(dow);
 
   const holiday = await db
     .select()
@@ -103,7 +169,9 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
     .where(eq(holidayCalendar.holidayDate, workDate))
     .limit(1);
 
-  const prevDate = manilaDateKey(Date.parse(`${workDate}T00:00:00Z`) - DAY_MS);
+  const prevDate = new Date(Date.parse(`${workDate}T00:00:00Z`) - DAY_MS)
+    .toISOString()
+    .slice(0, 10);
   const prev = await db
     .select({ status: attendanceDay.status })
     .from(attendanceDay)
@@ -112,19 +180,27 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
   const presenceBeforeHoliday =
     prev.length === 0 || !UNPAID.includes(prev[0].status as Status);
 
+  const incomplete = status === "INCOMPLETE_PUNCH";
   const values = {
     employeeId: employeeId as number,
     workDate,
     status: status as Status,
     source: "MANUAL" as const,
     punchInUtc,
+    break1OutUtc,
+    break1InUtc,
+    lunchOutUtc,
+    lunchInUtc,
+    break2OutUtc,
+    break2InUtc,
     punchOutUtc,
+    scheduleId: shift?.id ?? null,
     scheduledSeconds,
     workedSeconds,
-    paidBreakSeconds: 0,
+    paidBreakSeconds,
     lateSeconds,
     undertimeSeconds,
-    absentSeconds: needsPunch || status === "INCOMPLETE_PUNCH" ? 0 : scheduledSeconds,
+    absentSeconds: needsPunch || incomplete ? 0 : scheduledSeconds,
     otWorkedSeconds: otSeconds,
     otApprovedSeconds: otSeconds,
     nightSeconds,
@@ -133,8 +209,8 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
     holidayId: holiday[0]?.id ?? null,
     holidayKind: holiday[0]?.kind ?? "NONE",
     presenceBeforeHoliday,
-    needsReview: status === "INCOMPLETE_PUNCH",
-    reviewNote: status === "INCOMPLETE_PUNCH" ? "One side of the punch pair is missing." : null,
+    needsReview: incomplete || computedNote !== null,
+    reviewNote: incomplete ? "One side of the punch pair is missing." : computedNote,
     ruleVersion: RULE_VERSION,
     computedAt: new Date(),
   };

@@ -35,40 +35,53 @@ export function Clock() {
   );
 }
 
+const BUTTONS: [string, string][] = [
+  ["in", "IN"],
+  ["break1Out", "1st Break Out"],
+  ["break1In", "1st Break In"],
+  ["lunchOut", "Lunch Out"],
+  ["lunchIn", "Lunch In"],
+  ["break2Out", "2nd Break Out"],
+  ["break2In", "2nd Break In"],
+  ["out", "OUT"],
+];
+
 export function BundyForm() {
   const [state, formAction, pending] = useActionState(punch, null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const successRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
-    if (state?.message) formRef.current?.reset();
+    if (state?.message && successRef.current) successRef.current.scrollIntoView({ block: "nearest" });
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="w-full space-y-4">
-      <Field name="employeeNo" label="Employee no.">
-        <Input
-          id="employeeNo"
-          name="employeeNo"
-          autoComplete="off"
-          autoCapitalize="characters"
-          placeholder="E-0032"
-          className="h-12 text-base"
-          required
-        />
-      </Field>
-      <Field name="pin" label="Bundy PIN">
-        <Input
-          id="pin"
-          name="pin"
-          type="password"
-          inputMode="numeric"
-          maxLength={6}
-          autoComplete="off"
-          placeholder="••••"
-          className="h-12 text-base tracking-widest"
-          required
-        />
-      </Field>
+    <form action={formAction} className="w-full space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field name="employeeNo" label="Employee no.">
+          <Input
+            id="employeeNo"
+            name="employeeNo"
+            autoComplete="off"
+            autoCapitalize="characters"
+            placeholder="E-0032"
+            className="h-12 text-base"
+            required
+          />
+        </Field>
+        <Field name="pin" label="Bundy PIN">
+          <Input
+            id="pin"
+            name="pin"
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            autoComplete="off"
+            placeholder="••••"
+            className="h-12 text-base tracking-widest"
+            required
+          />
+        </Field>
+      </div>
 
       {state?.error ? (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">
@@ -76,19 +89,29 @@ export function BundyForm() {
         </p>
       ) : null}
       {state?.message ? (
-        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-center text-sm font-medium text-emerald-400">
+        <p
+          ref={successRef}
+          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-center text-sm font-medium text-emerald-400"
+        >
           {state.message}
         </p>
       ) : null}
 
-      <Button
-        type="submit"
-        disabled={pending}
-        className="h-14 w-full text-lg font-semibold"
-        size="lg"
-      >
-        {pending ? "Recording…" : "PUNCH"}
-      </Button>
+      <div className="grid grid-cols-2 gap-2">
+        {BUTTONS.map(([slot, label]) => (
+          <Button
+            key={slot}
+            type="submit"
+            name="slot"
+            value={slot}
+            disabled={pending}
+            variant={slot === "in" || slot === "out" ? "default" : "secondary"}
+            className="h-12 text-sm font-semibold"
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
     </form>
   );
 }

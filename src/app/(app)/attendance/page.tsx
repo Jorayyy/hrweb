@@ -124,6 +124,12 @@ export default async function AttendancePage({
         workDate: date,
         status: row[0].status,
         punchIn: fmtHM(row[0].punchInUtc) === "—" ? "" : fmtHM(row[0].punchInUtc),
+        break1Out: row[0].break1OutUtc ? fmtHM(row[0].break1OutUtc) : "",
+        break1In: row[0].break1InUtc ? fmtHM(row[0].break1InUtc) : "",
+        lunchOut: row[0].lunchOutUtc ? fmtHM(row[0].lunchOutUtc) : "",
+        lunchIn: row[0].lunchInUtc ? fmtHM(row[0].lunchInUtc) : "",
+        break2Out: row[0].break2OutUtc ? fmtHM(row[0].break2OutUtc) : "",
+        break2In: row[0].break2InUtc ? fmtHM(row[0].break2InUtc) : "",
         punchOut: fmtHM(row[0].punchOutUtc) === "—" ? "" : fmtHM(row[0].punchOutUtc),
         scheduledHours: String(row[0].scheduledSeconds / 3600),
       };

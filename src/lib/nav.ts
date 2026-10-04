@@ -1,6 +1,6 @@
 import type { UserRole } from "@/db/schema";
 
-export type IconKey = "dashboard" | "users" | "clock" | "wallet" | "settings";
+export type IconKey = "dashboard" | "users" | "clock" | "calendar" | "wallet" | "settings";
 
 export type NavItem = {
   href: string;
@@ -15,6 +15,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard", roles: ALL },
   { href: "/employees", label: "Employees", icon: "users", roles: ["ADMIN", "HR"] },
   { href: "/attendance", label: "Attendance", icon: "clock", roles: ["ADMIN", "HR"] },
+  { href: "/schedule", label: "Schedule", icon: "calendar", roles: ["ADMIN", "HR"] },
   { href: "/payroll", label: "Payroll", icon: "wallet", roles: ["ADMIN", "PAYROLL"] },
   { href: "/setup", label: "Setup", icon: "settings", roles: ["ADMIN", "HR"] },
 ];

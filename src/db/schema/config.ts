@@ -157,3 +157,24 @@ export const bundyIp = pgTable("bundy_ip", {
   label: text("label").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Reusable shift templates — the time basis for late/undertime/OT/break
+ * variance computation. All times are Manila "HH:MM"; end may be before
+ * start for overnight shifts.
+ */
+export const shiftTemplate = pgTable("shift_template", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  startsAt: text("starts_at").notNull(),
+  endsAt: text("ends_at").notNull(),
+  break1Start: text("break1_start").notNull(),
+  break1End: text("break1_end").notNull(),
+  lunchStart: text("lunch_start").notNull(),
+  lunchEnd: text("lunch_end").notNull(),
+  break2Start: text("break2_start").notNull(),
+  break2End: text("break2_end").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

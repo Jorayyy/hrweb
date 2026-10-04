@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CalendarDays,
   ChevronUp,
   Clock3,
   LayoutDashboard,
@@ -28,6 +29,7 @@ const ICONS: Record<IconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
   users: Users,
   clock: Clock3,
+  calendar: CalendarDays,
   wallet: Wallet,
   settings: Settings2,
 };

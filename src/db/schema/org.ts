@@ -11,6 +11,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { shiftTemplate } from "./config";
 
 /**
  * MONEY CONVENTION — every column suffixed / named as a monetary amount is
@@ -163,6 +164,8 @@ export const employee = pgTable(
     rdoCode: text("rdo_code"),
     /** scrypt hash of the web-bundy kiosk PIN. */
     bundyPin: text("bundy_pin"),
+    /** Shift template driving late/OT/break computation. */
+    shiftTemplateId: bigint("shift_template_id", { mode: "number" }).references(() => shiftTemplate.id),
     isMinimumWageExempt: boolean("is_minimum_wage_exempt").notNull().default(false),
     isManagerialTaxTbl: boolean("is_managerial_tax_tbl").notNull().default(false),
 

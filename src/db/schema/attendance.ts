@@ -46,6 +46,12 @@ export const attendanceDay = pgTable(
     status: attendanceStatus("status").notNull().default("PRESENT"),
     source: attendanceSource("source").notNull().default("CSV"),
     punchInUtc: timestamp("punch_in_utc", { withTimezone: true }),
+    break1OutUtc: timestamp("break1_out_utc", { withTimezone: true }),
+    break1InUtc: timestamp("break1_in_utc", { withTimezone: true }),
+    lunchOutUtc: timestamp("lunch_out_utc", { withTimezone: true }),
+    lunchInUtc: timestamp("lunch_in_utc", { withTimezone: true }),
+    break2OutUtc: timestamp("break2_out_utc", { withTimezone: true }),
+    break2InUtc: timestamp("break2_in_utc", { withTimezone: true }),
     punchOutUtc: timestamp("punch_out_utc", { withTimezone: true }),
 
     scheduledSeconds: bigint("scheduled_seconds", { mode: "number" }).notNull().default(0),

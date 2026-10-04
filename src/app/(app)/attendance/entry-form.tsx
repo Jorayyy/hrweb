@@ -13,6 +13,12 @@ export type EntryInitial = {
   workDate: string;
   status: string;
   punchIn: string;
+  break1Out: string;
+  break1In: string;
+  lunchOut: string;
+  lunchIn: string;
+  break2Out: string;
+  break2In: string;
   punchOut: string;
   scheduledHours: string;
 };
@@ -87,6 +93,24 @@ export function EntryForm({
         </Field>
         <Field label="Punch in (Manila)" name="punchIn" error={errors.punchIn}>
           <Input id="punchIn" name="punchIn" type="time" defaultValue={initial?.punchIn} />
+        </Field>
+        <Field label="1st break out" name="break1Out" error={errors.break1Out}>
+          <Input id="break1Out" name="break1Out" type="time" defaultValue={initial?.break1Out} />
+        </Field>
+        <Field label="1st break in" name="break1In" error={errors.break1In}>
+          <Input id="break1In" name="break1In" type="time" defaultValue={initial?.break1In} />
+        </Field>
+        <Field label="Lunch out" name="lunchOut" error={errors.lunchOut}>
+          <Input id="lunchOut" name="lunchOut" type="time" defaultValue={initial?.lunchOut} />
+        </Field>
+        <Field label="Lunch in" name="lunchIn" error={errors.lunchIn}>
+          <Input id="lunchIn" name="lunchIn" type="time" defaultValue={initial?.lunchIn} />
+        </Field>
+        <Field label="2nd break out" name="break2Out" error={errors.break2Out}>
+          <Input id="break2Out" name="break2Out" type="time" defaultValue={initial?.break2Out} />
+        </Field>
+        <Field label="2nd break in" name="break2In" error={errors.break2In}>
+          <Input id="break2In" name="break2In" type="time" defaultValue={initial?.break2In} />
         </Field>
         <Field label="Punch out (Manila)" name="punchOut" error={errors.punchOut}>
           <Input id="punchOut" name="punchOut" type="time" defaultValue={initial?.punchOut} />

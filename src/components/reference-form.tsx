@@ -9,7 +9,7 @@ import type { FormState } from "@/lib/form";
 export type ReferenceField = {
   name: string;
   label: string;
-  type?: "text" | "number" | "select" | "checkbox";
+  type?: "text" | "number" | "select" | "checkbox" | "time";
   required?: boolean;
   defaultChecked?: boolean;
   placeholder?: string;
@@ -78,7 +78,7 @@ export function ReferenceForm({
               <Input
                 id={field.name}
                 name={field.name}
-                type={field.type === "number" ? "number" : "text"}
+                type={field.type === "number" ? "number" : field.type === "time" ? "time" : "text"}
                 required={field.required}
                 placeholder={field.placeholder}
                 aria-invalid={Boolean(errors[field.name])}

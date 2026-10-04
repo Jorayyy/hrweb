@@ -46,6 +46,9 @@ const BUTTONS: [string, string][] = [
   ["out", "OUT"],
 ];
 
+const darkCx =
+  "h-12 text-base bg-white/5 border-white/15 text-white placeholder:text-zinc-500 hover:border-white/25 focus-visible:border-white/40 focus-visible:ring-white/20";
+
 export function BundyForm() {
   const [state, formAction, pending] = useActionState(punch, null);
   const successRef = useRef<HTMLParagraphElement>(null);
@@ -57,18 +60,18 @@ export function BundyForm() {
   return (
     <form action={formAction} className="w-full space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field name="employeeNo" label="Employee no.">
+        <Field name="employeeNo" label="Employee no." className="text-zinc-400">
           <Input
             id="employeeNo"
             name="employeeNo"
             autoComplete="off"
             autoCapitalize="characters"
             placeholder="E-0032"
-            className="h-12 text-base"
+            className={darkCx}
             required
           />
         </Field>
-        <Field name="pin" label="Bundy PIN">
+        <Field name="pin" label="Bundy PIN" className="text-zinc-400">
           <Input
             id="pin"
             name="pin"
@@ -77,7 +80,7 @@ export function BundyForm() {
             maxLength={6}
             autoComplete="off"
             placeholder="••••"
-            className="h-12 text-base tracking-widest"
+            className={`${darkCx} tracking-widest`}
             required
           />
         </Field>

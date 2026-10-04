@@ -21,7 +21,7 @@ export default async function NewEmployeePage() {
   if (missing.length > 0) {
     return (
       <>
-        <PageHeader title="Add employee" />
+        <PageHeader back title="Add employee" />
         <PageBody>
           <Card className="mx-auto max-w-2xl border-dashed">
             <CardHeader>
@@ -44,7 +44,7 @@ export default async function NewEmployeePage() {
 
   return (
     <>
-      <PageHeader title="Add employee" description="Daily rate = monthly ÷ 22, hourly = daily ÷ 8." />
+      <PageHeader back title="Add employee" description="Daily rate = monthly ÷ 22, hourly = daily ÷ 8." />
       <PageBody>
         <div className="mx-auto max-w-4xl">
           <Card>

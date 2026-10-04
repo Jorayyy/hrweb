@@ -84,6 +84,7 @@ export default async function PayrollPage({
   return (
     <>
       <PageHeader
+        back
         title="Payroll"
         description="Periods, cutoff runs, registers and payslips"
       >

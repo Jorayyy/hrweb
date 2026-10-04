@@ -77,6 +77,7 @@ export default async function EmployeesPage({
   return (
     <>
       <PageHeader
+        back
         title="Employees"
         description={`${visible.length} shown${truncated ? ` of 100+` : ""}`}
       >

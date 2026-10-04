@@ -84,6 +84,7 @@ export default async function SetupPage() {
   return (
     <>
       <PageHeader
+        back
         title="Setup"
         description="Organization reference data — required before employees can be added"
       />

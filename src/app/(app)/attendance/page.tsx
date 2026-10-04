@@ -133,6 +133,7 @@ export default async function AttendancePage({
   return (
     <>
       <PageHeader
+        back
         title="Attendance"
         description={`${rows.length} record${rows.length === 1 ? "" : "s"} on ${date}`}
       />

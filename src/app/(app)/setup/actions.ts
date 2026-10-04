@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { campaign, costCenter, department, jobPosition } from "@/db/schema";
+import { bundyIp, campaign, costCenter, department, jobPosition } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { field, intOrNull, type FormState } from "@/lib/form";
 
@@ -108,4 +109,33 @@ export async function addJobPosition(_prev: FormState, formData: FormData): Prom
 
   revalidatePath("/setup");
   return null;
+}
+
+const IPV4 = /^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+
+export async function addBundyIp(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireRole("ADMIN", "HR");
+
+  const ip = field(formData, "ip");
+  const label = field(formData, "label");
+  const errors: Record<string, string> = {};
+  if (!IPV4.test(ip)) errors.ip = "Enter a valid IPv4 address, e.g. 112.198.100.7.";
+  if (!label) errors.label = "Label is required.";
+  if (Object.keys(errors).length > 0) return { errors };
+
+  const [row] = await db
+    .insert(bundyIp)
+    .values({ ip, label })
+    .onConflictDoNothing()
+    .returning({ id: bundyIp.id });
+  if (!row) return { errors: { ip: "That IP is already registered." } };
+
+  revalidatePath("/setup");
+  return null;
+}
+
+export async function removeBundyIp(id: number): Promise<void> {
+  await requireRole("ADMIN", "HR");
+  await db.delete(bundyIp).where(eq(bundyIp.id, id));
+  revalidatePath("/setup");
 }

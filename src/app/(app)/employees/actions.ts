@@ -8,6 +8,7 @@ import { employee } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { parseEmployee, type EmployeeInput } from "@/lib/employee";
 import type { FormState } from "@/lib/form";
+import { hashPassword } from "@/lib/password";
 
 async function findClash(value: EmployeeInput, excludeId: number | null) {
   const condition = or(
@@ -47,7 +48,11 @@ export async function createEmployee(_prev: FormState, formData: FormData): Prom
   const clash = await findClash(parsed.value, null);
   if (clash) return { errors: clash };
 
-  await db.insert(employee).values(parsed.value);
+  const { bundyPin, ...values } = parsed.value;
+  await db.insert(employee).values({
+    ...values,
+    bundyPin: bundyPin ? await hashPassword(bundyPin) : null,
+  });
   revalidatePath("/employees");
   redirect("/employees?saved=1");
 }
@@ -69,9 +74,14 @@ export async function updateEmployee(
   const clash = await findClash(parsed.value, id);
   if (clash) return { errors: clash };
 
+  const { bundyPin, ...values } = parsed.value;
   await db
     .update(employee)
-    .set({ ...parsed.value, updatedAt: new Date() })
+    .set({
+      ...values,
+      ...(bundyPin ? { bundyPin: await hashPassword(bundyPin) } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(employee.id, id));
 
   revalidatePath("/employees");

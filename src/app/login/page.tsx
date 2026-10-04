@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LoginForm } from "./form";
 
 export default async function LoginPage({
@@ -13,6 +14,12 @@ export default async function LoginPage({
         <div className="text-lg font-semibold tracking-wide text-white">BPO-HRWeb</div>
         <p className="mt-1 text-sm text-zinc-400">Sign in to continue</p>
         <LoginForm callbackUrl={callbackUrl} />
+        <Link
+          href="/bundy"
+          className="mt-4 block rounded-lg border border-zinc-800 px-4 py-2.5 text-center text-sm text-zinc-300 hover:bg-zinc-900"
+        >
+          Time clock
+        </Link>
       </div>
     </div>
   );

@@ -311,6 +311,21 @@ export function EmployeeForm({
         </Field>
       </FormSection>
 
+      <FormSection title="Time clock" description="Bundy PIN for the web punch kiosk.">
+        <Field name="bundyPin" label="Bundy PIN" error={errors.bundyPin}>
+          <Input
+            id="bundyPin"
+            name="bundyPin"
+            type="password"
+            inputMode="numeric"
+            maxLength={6}
+            autoComplete="off"
+            placeholder={initial?.id ? "Leave blank to keep current PIN" : "4–6 digits"}
+            className={cx("bundyPin")}
+          />
+        </Field>
+      </FormSection>
+
       <section className="border-t border-border pt-5">
         <h2 className="text-sm font-semibold">Weekly rest days</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">

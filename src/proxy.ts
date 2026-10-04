@@ -14,6 +14,10 @@ export function proxy(request: NextRequest) {
     return hasSession ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next();
   }
 
+  if (pathname === "/bundy") {
+    return NextResponse.next();
+  }
+
   if (!hasSession) {
     const url = new URL("/login", request.url);
     url.searchParams.set("callbackUrl", pathname + request.nextUrl.search);

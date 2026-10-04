@@ -1,6 +1,7 @@
 export type FormState = {
   error?: string;
   errors?: Record<string, string>;
+  message?: string;
 } | null;
 
 export function field(formData: FormData, name: string): string {

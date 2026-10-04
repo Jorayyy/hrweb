@@ -161,6 +161,8 @@ export const employee = pgTable(
     philhealthNo: text("philhealth_no"),
     pagibigNo: text("pagibig_no"),
     rdoCode: text("rdo_code"),
+    /** scrypt hash of the web-bundy kiosk PIN. */
+    bundyPin: text("bundy_pin"),
     isMinimumWageExempt: boolean("is_minimum_wage_exempt").notNull().default(false),
     isManagerialTaxTbl: boolean("is_managerial_tax_tbl").notNull().default(false),
 

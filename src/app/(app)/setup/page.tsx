@@ -1,8 +1,9 @@
 import { db } from "@/db";
-import { campaign, costCenter, department, jobPosition } from "@/db/schema";
+import { bundyIp, campaign, costCenter, department, jobPosition } from "@/db/schema";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { ReferenceForm } from "@/components/reference-form";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { addCampaign, addCostCenter, addDepartment, addJobPosition } from "./actions";
+import { addBundyIp, addCampaign, addCostCenter, addDepartment, addJobPosition, removeBundyIp } from "./actions";
 
 type Row = { key: number | string; cells: React.ReactNode[] };
 
@@ -69,11 +70,12 @@ function Section({
 }
 
 export default async function SetupPage() {
-  const [costCenters, campaigns, departments, positions] = await Promise.all([
+  const [costCenters, campaigns, departments, positions, bundyIps] = await Promise.all([
     db.select().from(costCenter).orderBy(costCenter.code),
     db.select().from(campaign).orderBy(campaign.code),
     db.select().from(department).orderBy(department.code),
     db.select().from(jobPosition).orderBy(jobPosition.jobLevel, jobPosition.code),
+    db.select().from(bundyIp).orderBy(bundyIp.ip),
   ]);
 
   const costCenterOptions = costCenters.map((c) => ({
@@ -194,6 +196,34 @@ export default async function SetupPage() {
                 { name: "jobLevel", label: "Level", type: "number" },
                 { name: "isManagerial", label: "Managerial", type: "checkbox" },
               ]}
+            />
+          </Section>
+
+          <Section
+            title="Time clock IPs"
+            description="Only these IPs can record punches on the web bundy kiosk."
+            columns={["IP address", "Label", ""]}
+            empty="No IPs registered — the kiosk rejects every punch until at least one IP is added."
+            rows={bundyIps.map((b) => ({
+              key: b.id,
+              cells: [
+                <span key="ip" className="tabular-nums">{b.ip}</span>,
+                b.label,
+                <form key="remove" action={removeBundyIp.bind(null, b.id)} className="text-right">
+                  <Button type="submit" variant="ghost" size="sm" className="text-destructive">
+                    Remove
+                  </Button>
+                </form>,
+              ],
+            }))}
+          >
+            <ReferenceForm
+              action={addBundyIp}
+              fields={[
+                { name: "ip", label: "IP address", required: true, placeholder: "112.198.100.7" },
+                { name: "label", label: "Label", required: true, placeholder: "Office main" },
+              ]}
+              submitLabel="Register IP"
             />
           </Section>
         </div>

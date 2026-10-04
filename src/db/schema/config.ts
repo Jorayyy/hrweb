@@ -1,4 +1,4 @@
-import { bigint, boolean, date, index, numeric, pgEnum, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, index, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /** All monetary values are INTEGER CENTAVOS. Rates are unitless numeric. */
 
@@ -149,3 +149,11 @@ export const employeeAllowance = pgTable(
     index("ix_employee_allowance_active").on(t.employeeId),
   ],
 );
+
+/** IPs authorized to record punches on the web-bundy kiosk. */
+export const bundyIp = pgTable("bundy_ip", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  ip: text("ip").notNull().unique(),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

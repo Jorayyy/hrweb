@@ -1,0 +1,94 @@
+"use client";
+
+import { useEffect, useRef, useState, useActionState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { MANILA_OFFSET_MS } from "@/lib/time";
+import { punch } from "./actions";
+
+export function Clock() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const d = new Date(now + MANILA_OFFSET_MS);
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    <div className="text-center">
+      <div className="text-6xl font-semibold tabular-nums text-white sm:text-7xl">
+        {pad(d.getUTCHours())}:{pad(d.getUTCMinutes())}
+        <span className="text-3xl text-zinc-500 sm:text-4xl">:{pad(d.getUTCSeconds())}</span>
+      </div>
+      <div className="mt-2 text-sm text-zinc-400">
+        {days[d.getUTCDay()]}, {months[d.getUTCMonth()]} {d.getUTCDate()}, {d.getUTCFullYear()}
+      </div>
+    </div>
+  );
+}
+
+export function BundyForm() {
+  const [state, formAction, pending] = useActionState(punch, null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state?.message) formRef.current?.reset();
+  }, [state]);
+
+  return (
+    <form ref={formRef} action={formAction} className="w-full space-y-4">
+      <Field name="employeeNo" label="Employee no.">
+        <Input
+          id="employeeNo"
+          name="employeeNo"
+          autoComplete="off"
+          autoCapitalize="characters"
+          placeholder="E-0032"
+          className="h-12 text-base"
+          required
+        />
+      </Field>
+      <Field name="pin" label="Bundy PIN">
+        <Input
+          id="pin"
+          name="pin"
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          autoComplete="off"
+          placeholder="••••"
+          className="h-12 text-base tracking-widest"
+          required
+        />
+      </Field>
+
+      {state?.error ? (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-sm text-red-400">
+          {state.error}
+        </p>
+      ) : null}
+      {state?.message ? (
+        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-center text-sm font-medium text-emerald-400">
+          {state.message}
+        </p>
+      ) : null}
+
+      <Button
+        type="submit"
+        disabled={pending}
+        className="h-14 w-full text-lg font-semibold"
+        size="lg"
+      >
+        {pending ? "Recording…" : "PUNCH"}
+      </Button>
+    </form>
+  );
+}

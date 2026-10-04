@@ -26,6 +26,7 @@ export type EmployeeInput = {
   philhealthNo: string | null;
   pagibigNo: string | null;
   rdoCode: string | null;
+  bundyPin: string | null;
   isMinimumWageExempt: boolean;
   isManagerialTaxTbl: boolean;
   weeklyRestDays: number[];
@@ -92,6 +93,9 @@ export function parseEmployee(formData: FormData): ParseResult {
   if (salary === null) errors.baseSalaryMonthly = "Enter a valid amount, e.g. 18000.00";
   else if (salary < 0) errors.baseSalaryMonthly = "Salary cannot be negative.";
 
+  const bundyPin = field(formData, "bundyPin");
+  if (bundyPin && !/^\d{4,6}$/.test(bundyPin)) errors.bundyPin = "PIN must be 4–6 digits.";
+
   const restDays = fieldList(formData, "weeklyRestDays")
     .map((v) => Number(v))
     .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
@@ -126,6 +130,7 @@ export function parseEmployee(formData: FormData): ParseResult {
       philhealthNo: text.philhealthNo || null,
       pagibigNo: text.pagibigNo || null,
       rdoCode: text.rdoCode || null,
+      bundyPin: bundyPin || null,
       isMinimumWageExempt: formData.get("isMinimumWageExempt") === "on",
       isManagerialTaxTbl: formData.get("isManagerialTaxTbl") === "on",
       weeklyRestDays: uniqueRestDays,

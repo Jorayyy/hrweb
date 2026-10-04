@@ -1,5 +1,3 @@
-"use server";
-
 import { redirect } from "next/navigation";
 import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db";
@@ -10,6 +8,7 @@ import {
   employee,
   employeeAllowance,
   hdmfSchedule,
+  payrollJob,
   payrollPeriod,
   payrollRun,
   payrollRunItem,
@@ -18,7 +17,8 @@ import {
   sssSchedule,
 } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
-import { manilaDateKey, manilaToUtc } from "@/lib/time";
+import { field } from "@/lib/form";
+import { manilaDateKey, manilaDayOfWeek, manilaToUtc } from "@/lib/time";
 import {
   calcEmployee,
   type DayInput,
@@ -30,9 +30,10 @@ import type { PayFrequency, PremiumRow } from "@/lib/statutory/ph";
 
 const PAYRULE_VERSION = "pay-2026.1";
 const ENGINE_VERSION = "pay-2026.1";
+const DAY_MS = 86_400_000;
+const CHUNK = 25;
 
 const ALLOWED: Record<string, readonly string[]> = {
-  calculate: ["OPEN", "CUT_OFF", "CALCULATING", "CALCULATED", "REVIEW", "APPROVED"],
   approve: ["CALCULATED", "REVIEW"],
   post: ["APPROVED"],
   void: ["OPEN", "CUT_OFF", "CALCULATING", "CALCULATED", "REVIEW", "APPROVED"],
@@ -47,18 +48,71 @@ function back(periodId: number, runId?: number, error?: string): never {
   redirect(`/payroll?${qs.toString()}`);
 }
 
-export async function openPeriod(): Promise<never> {
+function isoWeek(ms: number): { year: number; week: number } {
+  const d = new Date(ms);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
+  const year = d.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  jan4.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + 3);
+  return { year, week: 1 + Math.round((d.getTime() - jan4.getTime()) / (7 * DAY_MS)) };
+}
+
+async function upsertPeriod(values: {
+  periodCode: string;
+  dateFrom: string;
+  dateTo: string;
+  cutoffAt: Date;
+  payDate: string;
+  frequency: PayFrequency;
+}): Promise<number> {
+  const [inserted] = await db
+    .insert(payrollPeriod)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ id: payrollPeriod.id });
+  if (inserted) return inserted.id;
+  const [existing] = await db
+    .select({ id: payrollPeriod.id })
+    .from(payrollPeriod)
+    .where(eq(payrollPeriod.periodCode, values.periodCode))
+    .limit(1);
+  if (!existing) redirect("/payroll?error=Could not open the period.");
+  return existing.id;
+}
+
+export async function openPeriod(formData: FormData): Promise<never> {
   await requireRole("ADMIN", "PAYROLL");
+  const frequency = field(formData, "frequency");
 
-  const today = manilaDateKey(Date.now());
-  const [y, m, d] = today.split("-").map(Number);
+  if (frequency === "WEEKLY") {
+    const now = Date.now();
+    const today = manilaDateKey(now);
+    const mondayUtc = Date.parse(`${today}T00:00:00Z`) - ((manilaDayOfWeek(now) + 6) % 7) * DAY_MS;
+    const sundayUtc = mondayUtc + 6 * DAY_MS;
+    const { year, week } = isoWeek(mondayUtc);
+    const sunday = new Date(sundayUtc);
+    const id = await upsertPeriod({
+      periodCode: `${year}-W${pad(week)}`,
+      dateFrom: new Date(mondayUtc).toISOString().slice(0, 10),
+      dateTo: new Date(sundayUtc).toISOString().slice(0, 10),
+      cutoffAt: new Date(
+        manilaToUtc(sunday.getUTCFullYear(), sunday.getUTCMonth(), sunday.getUTCDate(), 23, 59),
+      ),
+      payDate: new Date(sundayUtc + 7 * DAY_MS).toISOString().slice(0, 10),
+      frequency: "WEEKLY",
+    });
+    back(id);
+  }
 
+  if (frequency !== "SEMI_MONTHLY") {
+    redirect("/payroll?error=Choose a cutoff frequency.");
+  }
+
+  const [y, m, d] = todayParts();
   let dateFrom: string;
   let dateTo: string;
   let periodCode: string;
   let payDate: string;
-  const cutoffY = y;
-  const cutoffM = m;
   let cutoffD: number;
 
   if (d <= 15) {
@@ -78,23 +132,20 @@ export async function openPeriod(): Promise<never> {
     payDate = `${ny}-${pad(nm)}-10`;
   }
 
-  const cutoffAt = new Date(manilaToUtc(cutoffY, cutoffM - 1, cutoffD, 23, 59));
+  const id = await upsertPeriod({
+    periodCode,
+    dateFrom,
+    dateTo,
+    cutoffAt: new Date(manilaToUtc(y, m - 1, cutoffD, 23, 59)),
+    payDate,
+    frequency: "SEMI_MONTHLY",
+  });
+  back(id);
+}
 
-  const [inserted] = await db
-    .insert(payrollPeriod)
-    .values({ periodCode, dateFrom, dateTo, cutoffAt, payDate, frequency: "SEMI_MONTHLY" })
-    .onConflictDoNothing()
-    .returning({ id: payrollPeriod.id });
-
-  if (inserted) back(inserted.id);
-
-  const [existing] = await db
-    .select({ id: payrollPeriod.id })
-    .from(payrollPeriod)
-    .where(eq(payrollPeriod.periodCode, periodCode))
-    .limit(1);
-  if (!existing) redirect("/payroll?error=Could not open the period.");
-  back(existing.id);
+function todayParts(): [number, number, number] {
+  const [y, m, d] = manilaDateKey(Date.now()).split("-").map(Number);
+  return [y, m, d];
 }
 
 export async function createRun(periodId: number): Promise<never> {
@@ -177,6 +228,15 @@ export async function createRun(periodId: number): Promise<never> {
   back(periodId, run.id);
 }
 
+async function markJobs(runId: number, employeeIds: number[], status: "DONE" | "FAILED", error?: string) {
+  for (let i = 0; i < employeeIds.length; i += 100) {
+    await db
+      .update(payrollJob)
+      .set(error !== undefined ? { status, error } : { status })
+      .where(and(eq(payrollJob.runId, runId), inArray(payrollJob.employeeId, employeeIds.slice(i, i + 100))));
+  }
+}
+
 export async function calculateRun(periodId: number, runId: number): Promise<never> {
   await requireRole("ADMIN", "PAYROLL");
 
@@ -229,6 +289,11 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
   if (!sssRow || !phicRow || !hdmfRow || birRows.length === 0 || premRows.length === 0)
     back(periodId, runId, "Run configuration is incomplete.");
 
+  const payFamily =
+    period.frequency === "WEEKLY"
+      ? (["WEEKLY", "DAILY"] as const)
+      : (["SEMI_MONTHLY", "MONTHLY"] as const);
+
   const emps = await db
     .select({
       id: employee.id,
@@ -237,10 +302,16 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
       isMinimumWageExempt: employee.isMinimumWageExempt,
     })
     .from(employee)
-    .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]))
+    .where(
+      and(
+        inArray(employee.status, ["ACTIVE", "ON_LEAVE"]),
+        inArray(employee.payFrequency, payFamily),
+      ),
+    )
     .orderBy(employee.lastName, employee.firstName)
     .limit(5000);
-  if (emps.length === 0) back(periodId, runId, "No active employees to calculate.");
+  if (emps.length === 0)
+    back(periodId, runId, "No active employees on this cutoff's pay frequency.");
 
   const ids = emps.map((e) => e.id);
   const allowanceRows = await db
@@ -315,65 +386,83 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
   }
 
   const items: RunItemComputed[] = [];
-  for (const emp of emps) {
-    const days = (daysByEmp.get(emp.id) ?? []).map(
-      (d): DayInput => ({
-        workDate: d.workDate,
-        status: d.status,
-        holidayKind: d.holidayKind,
-        isRestDay: d.isRestDay,
-        presenceBeforeHoliday: d.presenceBeforeHoliday,
-        workedSeconds: d.workedSeconds,
-        scheduledSeconds: d.scheduledSeconds,
-        lateSeconds: d.lateSeconds,
-        undertimeSeconds: d.undertimeSeconds,
-        absentSeconds: d.absentSeconds,
-        otWorkedSeconds: d.otWorkedSeconds,
-        nightSeconds: d.nightSeconds,
-        nightOtSeconds: d.nightOtSeconds,
-      }),
-    );
-    items.push(
-      calcEmployee(
-        {
-          id: emp.id,
-          baseSalaryMonthly: emp.baseSalaryMonthly,
-          payFrequency: emp.payFrequency,
-          isMinimumWageExempt: emp.isMinimumWageExempt,
-          allowances: allowancesByEmp.get(emp.id) ?? [],
-        },
-        days,
-        cfg,
-      ),
-    );
-  }
+  const failedIds: number[] = [];
 
-  await db.delete(payrollRunItem).where(eq(payrollRunItem.runId, runId));
-  for (const item of items) {
-    const { status, ...values } = item;
+  try {
+    await db.update(payrollRun).set({ status: "CALCULATING" }).where(eq(payrollRun.id, runId));
+    await db.delete(payrollJob).where(eq(payrollJob.runId, runId));
+    for (let i = 0; i < emps.length; i += 200) {
+      await db
+        .insert(payrollJob)
+        .values(emps.slice(i, i + 200).map((e) => ({ runId, employeeId: e.id, shard: e.id % 16 })));
+    }
+    await db.delete(payrollRunItem).where(eq(payrollRunItem.runId, runId));
+
+    for (const emp of emps) {
+      try {
+        const item = calcEmployee(
+          {
+            id: emp.id,
+            baseSalaryMonthly: emp.baseSalaryMonthly,
+            payFrequency: emp.payFrequency,
+            isMinimumWageExempt: emp.isMinimumWageExempt,
+            allowances: allowancesByEmp.get(emp.id) ?? [],
+          },
+          (daysByEmp.get(emp.id) ?? []).map(
+            (d): DayInput => ({
+              workDate: d.workDate,
+              status: d.status,
+              holidayKind: d.holidayKind,
+              isRestDay: d.isRestDay,
+              presenceBeforeHoliday: d.presenceBeforeHoliday,
+              workedSeconds: d.workedSeconds,
+              scheduledSeconds: d.scheduledSeconds,
+              lateSeconds: d.lateSeconds,
+              undertimeSeconds: d.undertimeSeconds,
+              absentSeconds: d.absentSeconds,
+              otWorkedSeconds: d.otWorkedSeconds,
+              nightSeconds: d.nightSeconds,
+              nightOtSeconds: d.nightOtSeconds,
+            }),
+          ),
+          cfg,
+        );
+        items.push(item);
+        if (items.length % 10 === 0) await markJobs(runId, items.slice(-10).map((i) => i.employeeId), "DONE");
+      } catch (e) {
+        failedIds.push(emp.id);
+        await markJobs(runId, [emp.id], "FAILED", String(e instanceof Error ? e.message : e).slice(0, 500));
+      }
+    }
+
+    for (let i = 0; i < items.length; i += CHUNK) {
+      await db
+        .insert(payrollRunItem)
+        .values(items.slice(i, i + CHUNK).map((item) => ({ runId, ...item, calcEngineVer: ENGINE_VERSION })));
+    }
+  } finally {
+    const doneIds = items.map((i) => i.employeeId);
+    const tail = doneIds.slice(Math.floor(doneIds.length / 10) * 10);
+    if (tail.length > 0) await markJobs(runId, tail, "DONE");
+
+    const grossTotal = items.reduce((s, i) => s + i.grossPay, 0);
+    const deductionTotal = items.reduce((s, i) => s + i.totalDeductions, 0);
+    const netTotal = items.reduce((s, i) => s + i.netPay, 0);
     await db
-      .insert(payrollRunItem)
-      .values({ runId, ...values, status, calcEngineVer: ENGINE_VERSION });
+      .update(payrollRun)
+      .set({
+        status: "CALCULATED",
+        headcount: items.length,
+        grossTotal,
+        deductionTotal,
+        netTotal,
+        approvedBy: null,
+        approvedAt: null,
+      })
+      .where(eq(payrollRun.id, runId));
   }
 
-  const grossTotal = items.reduce((s, i) => s + i.grossPay, 0);
-  const deductionTotal = items.reduce((s, i) => s + i.totalDeductions, 0);
-  const netTotal = items.reduce((s, i) => s + i.netPay, 0);
-
-  await db
-    .update(payrollRun)
-    .set({
-      status: "CALCULATED",
-      headcount: items.length,
-      grossTotal,
-      deductionTotal,
-      netTotal,
-      approvedBy: null,
-      approvedAt: null,
-    })
-    .where(eq(payrollRun.id, runId));
-
-  back(periodId, runId);
+  back(periodId, runId, failedIds.length > 0 ? `${failedIds.length} employee(s) failed — see job log.` : undefined);
 }
 
 export async function transitionRun(

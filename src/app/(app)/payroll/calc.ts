@@ -205,10 +205,15 @@ export function calcEmployee(
 
   let basicPay: number;
   if (emp.payFrequency === "MONTHLY") {
-    basicPay = emp.baseSalaryMonthly;
+    // Fixed monthly salary: one full month across the month's cutoff runs, no absence deduction.
+    basicPay =
+      cfg.frequency === "MONTHLY"
+        ? emp.baseSalaryMonthly
+        : semiMonthly(emp.baseSalaryMonthly, cfg.cutoffIndex === 1);
   } else if (emp.payFrequency === "SEMI_MONTHLY") {
     basicPay = Math.max(0, semiMonthly(emp.baseSalaryMonthly, cfg.cutoffIndex === 1) - daysAbsent * daily);
   } else {
+    // WEEKLY / DAILY paid: no work, no pay.
     basicPay = (daysWorked + daysLeavePaid) * daily;
   }
 

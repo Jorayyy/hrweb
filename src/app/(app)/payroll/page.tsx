@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { employee, payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
@@ -7,6 +7,7 @@ import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { selectCx } from "@/components/ui/field";
 import {
   Table,
   TableBody,
@@ -16,14 +17,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CalculateButton } from "./calculate-button";
 import { calculateRun, createRun, openPeriod, transitionRun } from "./actions";
 
-const REGISTER_LIMIT = 500;
+const PAGE_SIZE = 25;
 
 export default async function PayrollPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ period?: string; run?: string; error?: string }>;
+  searchParams?: Promise<{ period?: string; run?: string; page?: string; error?: string }>;
 }) {
   await requireRole("ADMIN", "PAYROLL");
 
@@ -48,6 +50,17 @@ export default async function PayrollPage({
     : [];
   const run = runs.find((r) => r.id === Number(params.run)) ?? runs[0] ?? null;
 
+  const totalItems = run
+    ? (
+        await db
+          .select({ n: count() })
+          .from(payrollRunItem)
+          .where(eq(payrollRunItem.runId, run.id))
+      )[0].n
+    : 0;
+  const pages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
+
   const items =
     run && period
       ? await db
@@ -61,19 +74,12 @@ export default async function PayrollPage({
           .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
           .where(eq(payrollRunItem.runId, run.id))
           .orderBy(employee.lastName, employee.firstName)
-          .limit(REGISTER_LIMIT + 1)
+          .limit(PAGE_SIZE)
+          .offset((page - 1) * PAGE_SIZE)
       : [];
 
-  const truncated = items.length > REGISTER_LIMIT;
-  const visible = truncated ? items.slice(0, REGISTER_LIMIT) : items;
-  const totals = visible.reduce(
-    (acc, r) => ({
-      gross: acc.gross + r.item.grossPay,
-      deductions: acc.deductions + r.item.totalDeductions,
-      net: acc.net + r.item.netPay,
-    }),
-    { gross: 0, deductions: 0, net: 0 },
-  );
+  const registerHref = (target: number) =>
+    `/payroll?period=${periodId}&run=${run?.id ?? ""}&page=${target}`;
 
   return (
     <>
@@ -81,9 +87,13 @@ export default async function PayrollPage({
         title="Payroll"
         description="Periods, cutoff runs, registers and payslips"
       >
-        <form action={openPeriod}>
+        <form action={openPeriod} className="flex items-center gap-2">
+          <select name="frequency" defaultValue="SEMI_MONTHLY" className={`${selectCx} h-8 w-40`}>
+            <option value="SEMI_MONTHLY">Semi-monthly</option>
+            <option value="WEEKLY">Weekly</option>
+          </select>
           <Button type="submit" size="sm">
-            Open next cutoff
+            Open cutoff
           </Button>
         </form>
       </PageHeader>
@@ -100,7 +110,8 @@ export default async function PayrollPage({
             <CardHeader>
               <CardTitle>Cutoff periods</CardTitle>
               <CardDescription>
-                Semi-monthly cutoffs: 1–15th (pay on the 25th) and 16–last day (pay on the 10th).
+                Semi-monthly: 1–15th (pay 25th) and 16–last day (pay 10th). Weekly: Mon–Sun, paid
+                7 days after cutoff.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -141,7 +152,10 @@ export default async function PayrollPage({
                         </TableCell>
                         <TableCell className="text-muted-foreground">{p.frequency}</TableCell>
                         <TableCell className="text-right">
-                          <form action={createRun.bind(null, p.id)} className="inline-flex items-center gap-2">
+                          <form
+                            action={createRun.bind(null, p.id)}
+                            className="inline-flex items-center gap-2"
+                          >
                             <span className="text-muted-foreground">
                               {runs.length > 0 && p.id === periodId ? runs.length : "—"}
                             </span>
@@ -179,6 +193,7 @@ export default async function PayrollPage({
                   <TableBody>
                     {runs.map((r) => {
                       const selected = run?.id === r.id;
+                      const mutable = r.status !== "POSTED" && r.status !== "VOID";
                       return (
                         <TableRow key={r.id} className={selected ? "bg-muted/50" : undefined}>
                           <TableCell>
@@ -206,15 +221,16 @@ export default async function PayrollPage({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              {selected && r.status !== "POSTED" && r.status !== "VOID" ? (
-                                <form action={calculateRun.bind(null, period.id, r.id)}>
-                                  <Button type="submit" variant="outline" size="sm">
-                                    Calculate
-                                  </Button>
-                                </form>
+                              {selected && mutable ? (
+                                <CalculateButton
+                                  action={calculateRun.bind(null, period.id, r.id)}
+                                  runId={r.id}
+                                />
                               ) : null}
                               {selected && ["CALCULATED", "REVIEW"].includes(r.status) ? (
-                                <form action={transitionRun.bind(null, period.id, r.id, "approve")}>
+                                <form
+                                  action={transitionRun.bind(null, period.id, r.id, "approve")}
+                                >
                                   <Button type="submit" variant="outline" size="sm">
                                     Approve
                                   </Button>
@@ -227,7 +243,7 @@ export default async function PayrollPage({
                                   </Button>
                                 </form>
                               ) : null}
-                              {selected && r.status !== "POSTED" && r.status !== "VOID" ? (
+                              {selected && mutable ? (
                                 <form action={transitionRun.bind(null, period.id, r.id, "void")}>
                                   <Button type="submit" variant="ghost" size="sm">
                                     Void
@@ -252,13 +268,12 @@ export default async function PayrollPage({
                   Register — {period.periodCode} run #{run.runNo}
                 </CardTitle>
                 <CardDescription>
-                  {run.headcount ?? visible.length} employee
-                  {(run.headcount ?? visible.length) === 1 ? "" : "s"} · pay date{" "}
+                  {totalItems} employee{totalItems === 1 ? "" : "s"} · pay date{" "}
                   {formatDate(period.payDate)}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {visible.length === 0 ? (
+                {items.length === 0 ? (
                   <p className="py-10 text-center text-sm text-muted-foreground">
                     Run has no calculated rows yet — hit Calculate above.
                   </p>
@@ -278,7 +293,7 @@ export default async function PayrollPage({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {visible.map((r) => {
+                        {items.map((r) => {
                           const otHours =
                             r.item.hoursOtOrd +
                             r.item.hoursOtRd +
@@ -288,12 +303,17 @@ export default async function PayrollPage({
                           return (
                             <TableRow key={r.item.employeeId}>
                               <TableCell>
-                                <span className="block font-medium">
-                                  {r.lastName}, {r.firstName}
-                                </span>
-                                <span className="block text-xs text-muted-foreground">
-                                  {r.employeeNo}
-                                </span>
+                                <a
+                                  href={`/payroll/payslips/${run.id}/${r.item.employeeId}`}
+                                  className="hover:underline"
+                                >
+                                  <span className="block font-medium">
+                                    {r.lastName}, {r.firstName}
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {r.employeeNo}
+                                  </span>
+                                </a>
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {r.item.daysWorked}
@@ -322,23 +342,38 @@ export default async function PayrollPage({
                       </TableBody>
                       <TableFooter>
                         <TableRow>
-                          <TableCell colSpan={5}>Totals</TableCell>
+                          <TableCell colSpan={5}>Run totals</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {formatPhp(totals.gross)}
+                            {run.grossTotal != null ? formatPhp(run.grossTotal) : "—"}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {formatPhp(totals.deductions)}
+                            {run.deductionTotal != null ? formatPhp(run.deductionTotal) : "—"}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {formatPhp(totals.net)}
+                            {run.netTotal != null ? formatPhp(run.netTotal) : "—"}
                           </TableCell>
                         </TableRow>
                       </TableFooter>
                     </Table>
-                    {truncated ? (
-                      <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-                        Showing the first {REGISTER_LIMIT} rows.
-                      </p>
+
+                    {pages > 1 ? (
+                      <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
+                        <span className="text-muted-foreground">
+                          Page {page} of {pages} · {totalItems} employees
+                        </span>
+                        <div className="flex gap-2">
+                          {page > 1 ? (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={registerHref(page - 1)}>Previous</a>
+                            </Button>
+                          ) : null}
+                          {page < pages ? (
+                            <Button asChild variant="outline" size="sm">
+                              <a href={registerHref(page + 1)}>Next</a>
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                     ) : null}
                   </>
                 )}

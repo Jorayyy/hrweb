@@ -83,6 +83,23 @@ describe("calcEmployee", () => {
     expect(item.nsdPay).toBe(13_637);
   });
 
+  it("monthly-paid employees earn half per semi-monthly cutoff, not a full month twice", () => {
+    const monthly = { ...emp, payFrequency: "MONTHLY" as const };
+    expect(calcEmployee(monthly, [], cfg).basicPay).toBe(1_500_000);
+    expect(calcEmployee(monthly, [], { ...cfg, cutoffIndex: 1 }).basicPay).toBe(1_500_000);
+  });
+
+  it("weekly cutoff: daily/weekly pay is days worked × daily rate, statutory ÷ 52", () => {
+    const weeklyCfg: StatConfig = { ...cfg, frequency: "WEEKLY" };
+    const weekly = { ...emp, payFrequency: "WEEKLY" as const };
+    const item = calcEmployee(weekly, [day()], weeklyCfg);
+
+    expect(item.basicPay).toBe(136_364);
+    expect(item.sssEe + item.sssWispEe).toBe(2_885);
+    expect(item.phicEe).toBe(1_442);
+    expect(item.hdmfEe).toBe(385);
+  });
+
   it("invariants: gross and net always reconcile", () => {
     const item = calcEmployee(
       emp,

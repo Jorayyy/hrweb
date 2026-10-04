@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { count, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { employee, shiftTemplate } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
@@ -17,28 +17,92 @@ import {
 } from "@/components/ui/table";
 import { addShift, assignShift, removeShift } from "./actions";
 
-export default async function SchedulePage() {
+const PAGE_SIZE = 25;
+
+function Pagination({
+  page,
+  pages,
+  total,
+  label,
+  href,
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  label: string;
+  href: (target: number) => string;
+}) {
+  if (pages <= 1) return null;
+  return (
+    <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
+      <span className="text-muted-foreground">
+        Page {page} of {pages} · {total} {label}
+      </span>
+      <div className="flex gap-2">
+        {page > 1 ? (
+          <Button asChild variant="outline" size="sm">
+            <a href={href(page - 1)}>Previous</a>
+          </Button>
+        ) : null}
+        {page < pages ? (
+          <Button asChild variant="outline" size="sm">
+            <a href={href(page + 1)}>Next</a>
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ sp?: string; ep?: string }>;
+}) {
   await requireRole("ADMIN", "HR");
 
-  const [shifts, employees] = await Promise.all([
+  const params = (await searchParams) ?? {};
+  const activeStatuses = ["ACTIVE", "ON_LEAVE"] as const;
+
+  const [shifts, assignedCounts, staffTotal] = await Promise.all([
     db.select().from(shiftTemplate).orderBy(shiftTemplate.code),
     db
-      .select({
-        id: employee.id,
-        employeeNo: employee.employeeNo,
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        shiftTemplateId: employee.shiftTemplateId,
-      })
+      .select({ id: employee.shiftTemplateId, n: count() })
       .from(employee)
-      .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]))
-      .orderBy(employee.lastName, employee.firstName)
-      .limit(500),
+      .where(inArray(employee.status, [...activeStatuses]))
+      .groupBy(employee.shiftTemplateId),
+    db
+      .select({ n: count() })
+      .from(employee)
+      .where(inArray(employee.status, [...activeStatuses])),
   ]);
 
+  const shiftPages = Math.max(1, Math.ceil(shifts.length / PAGE_SIZE));
+  const sp = Math.min(Math.max(1, Number(params.sp) || 1), shiftPages);
+  const staffPages = Math.max(1, Math.ceil(staffTotal[0].n / PAGE_SIZE));
+  const ep = Math.min(Math.max(1, Number(params.ep) || 1), staffPages);
+
+  const employees = await db
+    .select({
+      id: employee.id,
+      employeeNo: employee.employeeNo,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      shiftTemplateId: employee.shiftTemplateId,
+    })
+    .from(employee)
+    .where(inArray(employee.status, [...activeStatuses]))
+    .orderBy(employee.lastName, employee.firstName)
+    .limit(PAGE_SIZE)
+    .offset((ep - 1) * PAGE_SIZE);
+
+  const shiftRows = shifts.slice((sp - 1) * PAGE_SIZE, sp * PAGE_SIZE);
+  const assignedCount = (id: number) => assignedCounts.find((c) => c.id === id)?.n ?? 0;
   const shiftOptions = shifts.map((s) => ({ value: String(s.id), label: `${s.code} — ${s.name}` }));
   const shiftLabel = (id: number | null) =>
     id ? (shifts.find((s) => s.id === id)?.code ?? "—") : "No shift";
+  const shiftHref = (target: number) => `/schedule?sp=${target}&ep=${ep}`;
+  const staffHref = (target: number) => `/schedule?sp=${sp}&ep=${target}`;
 
   return (
     <>
@@ -91,7 +155,7 @@ export default async function SchedulePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {shifts.map((s) => (
+                    {shiftRows.map((s) => (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">{s.code}</TableCell>
                         <TableCell>{s.name}</TableCell>
@@ -103,7 +167,7 @@ export default async function SchedulePage() {
                           {s.break2Start}–{s.break2End}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {employees.filter((e) => e.shiftTemplateId === s.id).length}
+                          {assignedCount(s.id)}
                         </TableCell>
                         <TableCell className="text-right">
                           <form action={removeShift.bind(null, s.id)}>
@@ -117,6 +181,13 @@ export default async function SchedulePage() {
                   </TableBody>
                 </Table>
               )}
+              <Pagination
+                page={sp}
+                pages={shiftPages}
+                total={shifts.length}
+                label="shifts"
+                href={shiftHref}
+              />
             </CardContent>
           </Card>
 
@@ -126,7 +197,7 @@ export default async function SchedulePage() {
               <CardDescription>Everyone needs a shift before they can punch in.</CardDescription>
             </CardHeader>
             <CardContent>
-              {employees.length === 0 ? (
+              {staffTotal[0].n === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">No employees yet.</p>
               ) : (
                 <Table>
@@ -172,6 +243,13 @@ export default async function SchedulePage() {
                   </TableBody>
                 </Table>
               )}
+              <Pagination
+                page={ep}
+                pages={staffPages}
+                total={staffTotal[0].n}
+                label="employees"
+                href={staffHref}
+              />
             </CardContent>
           </Card>
         </div>

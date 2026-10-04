@@ -30,13 +30,14 @@ function initials(first: string, last: string): string {
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; status?: string }>;
+  searchParams?: Promise<{ q?: string; status?: string; saved?: string }>;
 }) {
   await requireRole("ADMIN", "HR");
 
   const params = (await searchParams) ?? {};
   const q = (params.q ?? "").trim();
   const status = (params.status ?? "").trim();
+  const saved = (params.saved ?? "").trim();
   const statuses = employmentStatus.enumValues;
   const activeStatus = statuses.includes(status as (typeof statuses)[number]) ? status : "";
 
@@ -91,6 +92,11 @@ export default async function EmployeesPage({
       </PageHeader>
 
       <PageBody>
+        {saved ? (
+          <div className="mb-4 rounded-lg border border-emerald-600/30 bg-emerald-600/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+            Employee created.
+          </div>
+        ) : null}
         <Card>
           <CardHeader>
             <CardTitle>Roster</CardTitle>

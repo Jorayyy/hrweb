@@ -13,10 +13,17 @@ import { StatusBadge } from "@/components/status-badge";
 import { updateEmployee } from "../actions";
 import { ENUM_OPTIONS, employeeSelects } from "../queries";
 
-export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ saved?: string }>;
+}) {
   await requireRole("ADMIN", "HR");
 
   const { id: rawId } = await params;
+  const { saved } = (await searchParams) ?? {};
   const id = Number(rawId);
   if (!Number.isInteger(id)) notFound();
 
@@ -46,6 +53,11 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
       </PageHeader>
       <PageBody>
         <div className="mx-auto max-w-4xl">
+          {saved ? (
+            <div className="mb-4 rounded-lg border border-emerald-600/30 bg-emerald-600/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+              Changes saved.
+            </div>
+          ) : null}
           <Card>
             <CardContent className="pt-6">
               <EmployeeForm

@@ -49,7 +49,7 @@ export async function createEmployee(_prev: FormState, formData: FormData): Prom
 
   await db.insert(employee).values(parsed.value);
   revalidatePath("/employees");
-  redirect("/employees");
+  redirect("/employees?saved=1");
 }
 
 export async function updateEmployee(
@@ -75,5 +75,5 @@ export async function updateEmployee(
     .where(eq(employee.id, id));
 
   revalidatePath("/employees");
-  redirect(`/employees/${id}`);
+  redirect(`/employees/${id}?saved=1`);
 }

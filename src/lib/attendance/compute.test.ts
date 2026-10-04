@@ -127,4 +127,26 @@ describe("computeDay", () => {
     expect(r.nightSeconds).toBe(3 * 3600);
     expect(r.nightOtSeconds).toBe(2 * 3600);
   });
+
+  it("handles a shift with no 1st/2nd breaks: no break notes, lunch still tracked", () => {
+    const r = computeDay(
+      DAY,
+      { ...DAY_SHIFT, break1Start: null, break1End: null, break2Start: null, break2End: null },
+      {
+        inUtc: t("08:00"),
+        break1OutUtc: null,
+        break1InUtc: null,
+        lunchOutUtc: t("12:00"),
+        lunchInUtc: t("13:00"),
+        break2OutUtc: null,
+        break2InUtc: null,
+        outUtc: t("17:00"),
+      },
+    );
+    expect(r.scheduledSeconds).toBe(8 * 3600);
+    expect(r.workedSeconds).toBe(8 * 3600);
+    expect(r.paidBreakSeconds).toBe(0);
+    expect(r.needsReview).toBe(false);
+    expect(r.reviewNote).toBeNull();
+  });
 });

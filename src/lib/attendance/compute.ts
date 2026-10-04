@@ -6,12 +6,12 @@ const MIN_MS = 60_000;
 export type ShiftTemplateInput = {
   startsAt: string;
   endsAt: string;
-  break1Start: string;
-  break1End: string;
+  break1Start: string | null;
+  break1End: string | null;
   lunchStart: string;
   lunchEnd: string;
-  break2Start: string;
-  break2End: string;
+  break2Start: string | null;
+  break2End: string | null;
 };
 
 export type PunchSet = {
@@ -62,12 +62,12 @@ export function computeDay(
 ): ComputedDay {
   const shiftStartMs = at(workDate, shift.startsAt, -1);
   const shiftEndMs = at(workDate, shift.endsAt, shiftStartMs, true);
-  const b1Start = at(workDate, shift.break1Start, shiftStartMs);
-  const b1End = at(workDate, shift.break1End, b1Start);
+  const b1Start = shift.break1Start ? at(workDate, shift.break1Start, shiftStartMs) : null;
+  const b1End = b1Start !== null && shift.break1End ? at(workDate, shift.break1End, b1Start) : null;
   const lunchStartMs = at(workDate, shift.lunchStart, shiftStartMs);
   const lunchEndMs = at(workDate, shift.lunchEnd, lunchStartMs);
-  const b2Start = at(workDate, shift.break2Start, lunchEndMs);
-  const b2End = at(workDate, shift.break2End, b2Start);
+  const b2Start = shift.break2Start ? at(workDate, shift.break2Start, lunchEndMs) : null;
+  const b2End = b2Start !== null && shift.break2End ? at(workDate, shift.break2End, b2Start) : null;
 
   const scheduledLunchMs = lunchEndMs - lunchStartMs;
   const scheduledSeconds = Math.max(
@@ -128,9 +128,9 @@ export function computeDay(
       notes.push(`${label} not punched`);
     }
   };
-  window("1st break", b1Start, b1End, b1Out, b1In);
+  if (b1Start !== null && b1End !== null) window("1st break", b1Start, b1End, b1Out, b1In);
   window("Lunch", lunchStartMs, lunchEndMs, lOut, lIn);
-  window("2nd break", b2Start, b2End, b2Out, b2In);
+  if (b2Start !== null && b2End !== null) window("2nd break", b2Start, b2End, b2Out, b2In);
 
   if (inMs === null) notes.unshift("Missing punch in");
   else if (outMs === null) notes.push("Missing punch out");

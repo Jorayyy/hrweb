@@ -57,6 +57,13 @@ function manilaStamp(ms: number): string {
 }
 
 type DayRow = typeof attendanceDay.$inferSelect;
+type ShiftRow = typeof shiftTemplate.$inferSelect;
+
+function slotEnabled(slot: Slot, shift: ShiftRow): boolean {
+  if (slot.startsWith("break1")) return shift.break1Start !== null;
+  if (slot.startsWith("break2")) return shift.break2Start !== null;
+  return true;
+}
 
 function slotTime(row: DayRow | undefined, slot: Slot): Date | null {
   if (!row) return null;
@@ -157,6 +164,10 @@ export async function punch(_prev: FormState, formData: FormData): Promise<FormS
     .where(eq(shiftTemplate.id, emp.shiftTemplateId))
     .limit(1);
   if (!shift) return { error: "Assigned shift not found — see HR." };
+  if (!slotEnabled(slot, shift)) {
+    const name = slot.startsWith("break1") ? "1st break" : "2nd break";
+    return { error: `Your shift has no ${name} — punch In or Out instead.` };
+  }
 
   const now = Date.now();
   const nowUtc = new Date(now);
@@ -233,7 +244,7 @@ export async function punch(_prev: FormState, formData: FormData): Promise<FormS
     });
   }
 
-  const next = SLOTS.find((s) => s !== slot && !slotTime(row, s));
+  const next = SLOTS.find((s) => s !== slot && slotEnabled(s, shift) && !slotTime(row, s));
 
   return {
     message: next

@@ -117,8 +117,8 @@ export default async function SchedulePage({
             <CardHeader>
               <CardTitle>Shift templates</CardTitle>
               <CardDescription>
-                Lunch is unpaid; AM/PM breaks are paid. Overnight shifts are supported (end time
-                earlier than start).
+                Lunch is required and unpaid; 1st/2nd breaks are optional and paid. Overnight
+                shifts are supported (end time earlier than start).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -130,12 +130,12 @@ export default async function SchedulePage({
                   { name: "name", label: "Name", required: true, placeholder: "Day 8AM–5PM" },
                   { name: "startsAt", label: "Start", type: "time", required: true },
                   { name: "endsAt", label: "End", type: "time", required: true },
-                  { name: "break1Start", label: "1st break from", type: "time", required: true },
-                  { name: "break1End", label: "1st break to", type: "time", required: true },
+                  { name: "break1Start", label: "1st break from", type: "time" },
+                  { name: "break1End", label: "1st break to", type: "time" },
                   { name: "lunchStart", label: "Lunch from", type: "time", required: true },
                   { name: "lunchEnd", label: "Lunch to", type: "time", required: true },
-                  { name: "break2Start", label: "2nd break from", type: "time", required: true },
-                  { name: "break2End", label: "2nd break to", type: "time", required: true },
+                  { name: "break2Start", label: "2nd break from", type: "time" },
+                  { name: "break2End", label: "2nd break to", type: "time" },
                 ]}
               />
               {shifts.length === 0 ? (
@@ -163,8 +163,9 @@ export default async function SchedulePage({
                           {s.startsAt} – {s.endsAt}
                         </TableCell>
                         <TableCell className="text-xs tabular-nums text-muted-foreground">
-                          {s.break1Start}–{s.break1End} · {s.lunchStart}–{s.lunchEnd} ·{" "}
-                          {s.break2Start}–{s.break2End}
+                          {s.break1Start ? `${s.break1Start}–${s.break1End}` : "—"} ·{" "}
+                          {s.lunchStart}–{s.lunchEnd} ·{" "}
+                          {s.break2Start ? `${s.break2Start}–${s.break2End}` : "—"}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {assignedCount(s.id)}

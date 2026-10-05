@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-10-05 · repo `c68b4f4` · companion to `ENTERPRISE_GAP_ANALYSIS.md`
 
-> **Status 2026-10-05:** Phase 1 exit fixes applied — **A1–A4** (spec-doc corrections), **B1** (overnight anchor interim fix + tests), **B2** (state machine: APPROVED recalc blocked, success-in-try, rollback-on-error, approve blocked on failed jobs), **B3** (net invariant), **B5** (`.limit(5000)` removed), **B8** (/setup gate), **B9** (employee dashboard), **B11/A4** (statutory seed: SSS eff-date/source, RR 29-2025 caps, RD_SUB taxable), **C7** (CI workflow). Remaining: B4, B6, B7, B10, B12–B14, A5–A6, all C items — see roadmap.
+> **Status 2026-10-05:** Phase 1 exit fixes applied — **A1–A4** (spec-doc corrections), **B1** (overnight anchor interim fix + tests), **B2** (state machine: APPROVED recalc blocked, success-in-try, rollback-on-error, approve blocked on failed jobs), **B3** (net invariant), **B5** (`.limit(5000)` removed), **B8** (/setup gate), **B9** (employee dashboard), **B11/A4** (statutory seed: SSS eff-date/source, RR 29-2025 caps, RD_SUB taxable), **C7** (CI workflow). **Phase 2 applied (same date):** **C8** (`db:push` renamed `db:push:dev`, README migration workflow), **C5** (decided: single company — no tenant scoping, gap §6.1), statutory selectors now honor `effectiveTo` (createRun, `payroll/actions.ts`), `employee_compensation_history` ledger added + backfilled (migration `0001`, idempotent) + written on create/update. Remaining: B4, B6, B7, B10, B12–B14, A5–A6, other C items — see roadmap.
 
 Scope: two things — (A) defects in **ARCHITECTURE.md itself** (the supplied canonical spec), (B) defects in the **implementation**, (C) structural design problems, (D) the regression tests each fix needs. Every claim below was verified against source (file:line) or an authoritative statutory source (see GAP_ANALYSIS §4).
 
@@ -147,10 +147,10 @@ Ordered by severity. Each: **root cause → impact → fix → test**.
 2. **AuthZ model too thin** (C2) — 4 flat roles, no permissions/scopes, no supervisor scoping. Every feature from Phase 5 onward needs `requirePerm("attendance.correct", scope)`. Build before leave/ESS/supervisor work (Phase 3), or those features hardcode roles and get rewritten.
 3. **Sync everything, no queue** (C3) — payroll (B5), and later exports/recompute/notifications, all run inside the request. One generic `job` loop + worker entrypoint fixes payroll, exports, and variance in one shot.
 4. **Single shift pointer blocks scheduling truth** (C4) — `employee.shift_template_id` + `weekly_rest_days[]` cannot express rotations, per-date rest days, or the schedule anchor B1 needs. `schedule_day` materialization (Phase 5) is the prerequisite for correct attendance (B1, B7, B4).
-5. **Multi-tenancy decision deferred costs money later** (C5) — no `company` table. If SaaS is ever possible, scope columns must exist from Phase 2; retrofitting = migration of every table. **Decision needed (gap §6.1).**
+5. **Multi-tenancy decision deferred costs money later** (C5) — no `company` table. **Decided 2026-10-05: single-company deployment — no tenant scoping. C5 closed.** If SaaS ever becomes a requirement, this must be revisited as a dedicated project.
 6. **Zero observability** (C6) — no logger, no request ids, `console`/`logger` appear nowhere in `src/`; errors in `catch` blocks become flash strings or are swallowed (B2). Add structured JSON logging with request+run ids early (Phase 3/15) — retro-fitting logs into a payroll incident is too late.
 7. **No CI** (C7) — no `.github/`; `tsc`/lint/tests are local habits only. A 6-line PR workflow (lint+type+test) is the cheapest item in this document.
-8. **`db:push` available on prod** (C8) — `package.json` scripts permit schema push against Neon; one typo from dropping data. Migrations-only for prod, enforced in docs + CI.
+8. **`db:push` available on prod** (C8) — ~~`package.json` scripts permit schema push against Neon~~ **Applied 2026-10-05:** script renamed to `db:push:dev` (local throwaway DBs only) + README migration workflow; prod path is `db:migrate` only.
 
 ---
 

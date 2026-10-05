@@ -1,7 +1,7 @@
 import "../env";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../src/db";
-import { campaign, costCenter, department, employee, jobPosition, users } from "../src/db/schema";
+import { campaign, costCenter, department, employee, employeeCompensationHistory, jobPosition, users } from "../src/db/schema";
 import { hashPassword } from "../src/lib/password";
 
 const DAY = 86400000;
@@ -131,6 +131,14 @@ async function main() {
 
   if (seededNo.length > 0) {
     await db.update(employee).set({ reportsToId: null }).where(inArray(employee.employeeNo, seededNo));
+    await db
+      .delete(employeeCompensationHistory)
+      .where(
+        inArray(
+          employeeCompensationHistory.employeeId,
+          db.select({ id: employee.id }).from(employee).where(inArray(employee.employeeNo, seededNo)),
+        ),
+      );
     await db.delete(employee).where(inArray(employee.employeeNo, seededNo));
   }
 
@@ -243,6 +251,30 @@ async function main() {
   await db.insert(employee).values(rows).onConflictDoNothing();
 
   const byNo = new Map((await db.select().from(employee)).map((r) => [r.employeeNo, r]));
+
+  const haveHist = new Set(
+    (
+      await db
+        .select({ employeeId: employeeCompensationHistory.employeeId })
+        .from(employeeCompensationHistory)
+    ).map((r) => r.employeeId),
+  );
+  const missingHist = [...byNo.values()].filter((r) => !haveHist.has(r.id));
+  if (missingHist.length > 0) {
+    await db
+      .insert(employeeCompensationHistory)
+      .values(
+        missingHist.map((r) => ({
+          employeeId: r.id,
+          baseSalaryMonthly: r.baseSalaryMonthly,
+          payFrequency: r.payFrequency,
+          effectiveFrom: r.dateHired,
+          reason: "HIRE",
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
   const directorNo = departmentHeads.get("HR") as string;
   const director = byNo.get(directorNo);
 

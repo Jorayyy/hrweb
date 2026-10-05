@@ -184,3 +184,28 @@ export const employee = pgTable(
     uniqueIndex("ux_employee_external").on(t.externalCode, t.campaignId),
   ],
 );
+
+/**
+ * Append-only compensation ledger: one row per (employee, effective date).
+ * Current compensation = latest row with effective_from <= today; a
+ * same-day correction upserts its row. Never UPDATE or DELETE history rows
+ * outside seed/reset flows.
+ */
+export const employeeCompensationHistory = pgTable(
+  "employee_compensation_history",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    employeeId: bigint("employee_id", { mode: "number" })
+      .notNull()
+      .references(() => employee.id),
+    /** CENTAVOS per month. */
+    baseSalaryMonthly: bigint("base_salary_monthly", { mode: "number" }).notNull(),
+    payFrequency: payFrequency("pay_frequency").notNull(),
+    effectiveFrom: date("effective_from", { mode: "string" }).notNull(),
+    /** HIRE | SALARY_CHANGE | PAY_FREQ_CHANGE | COMP_CHANGE */
+    reason: text("reason").notNull(),
+    changedBy: text("changed_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("ux_comp_history").on(t.employeeId, t.effectiveFrom)],
+);

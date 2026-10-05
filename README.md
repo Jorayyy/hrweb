@@ -16,6 +16,20 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Database
+
+Schema changes are migration-based. Never use `db:push` against shared/dev-prod data.
+
+```bash
+npm run db:generate   # create a migration from schema changes (src/db/migrations/)
+npm run db:migrate    # apply pending migrations (use this on any shared DB)
+npm run db:push:dev   # local throwaway DBs only — bypasses migration history
+npm run db:seed       # statutory + org seed data (idempotent)
+npm run db:studio     # browse data
+```
+
+Workflow: edit `src/db/schema/*` → `db:generate` → review the SQL → `db:migrate` → commit the migration files.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

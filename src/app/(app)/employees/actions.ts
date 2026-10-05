@@ -4,11 +4,12 @@ import { and, eq, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { employee } from "@/db/schema";
+import { employee, employeeCompensationHistory } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { parseEmployee, type EmployeeInput } from "@/lib/employee";
 import type { FormState } from "@/lib/form";
 import { hashPassword } from "@/lib/password";
+import { manilaDateKey } from "@/lib/time";
 
 async function findClash(value: EmployeeInput, excludeId: number | null) {
   const condition = or(
@@ -40,7 +41,7 @@ async function findClash(value: EmployeeInput, excludeId: number | null) {
 }
 
 export async function createEmployee(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireRole("ADMIN", "HR");
+  const user = await requireRole("ADMIN", "HR");
 
   const parsed = parseEmployee(formData);
   if (!parsed.ok) return { errors: parsed.errors };
@@ -49,9 +50,20 @@ export async function createEmployee(_prev: FormState, formData: FormData): Prom
   if (clash) return { errors: clash };
 
   const { bundyPin, ...values } = parsed.value;
-  await db.insert(employee).values({
-    ...values,
-    bundyPin: bundyPin ? await hashPassword(bundyPin) : null,
+  const [created] = await db
+    .insert(employee)
+    .values({
+      ...values,
+      bundyPin: bundyPin ? await hashPassword(bundyPin) : null,
+    })
+    .returning({ id: employee.id });
+  await db.insert(employeeCompensationHistory).values({
+    employeeId: created.id,
+    baseSalaryMonthly: values.baseSalaryMonthly,
+    payFrequency: values.payFrequency,
+    effectiveFrom: values.dateHired,
+    reason: "HIRE",
+    changedBy: user.id,
   });
   revalidatePath("/employees");
   redirect("/employees?saved=1");
@@ -62,7 +74,7 @@ export async function updateEmployee(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireRole("ADMIN", "HR");
+  const user = await requireRole("ADMIN", "HR");
 
   const parsed = parseEmployee(formData);
   if (!parsed.ok) return { errors: parsed.errors };
@@ -74,6 +86,15 @@ export async function updateEmployee(
   const clash = await findClash(parsed.value, id);
   if (clash) return { errors: clash };
 
+  const [prev] = await db
+    .select({
+      baseSalaryMonthly: employee.baseSalaryMonthly,
+      payFrequency: employee.payFrequency,
+    })
+    .from(employee)
+    .where(eq(employee.id, id))
+    .limit(1);
+
   const { bundyPin, ...values } = parsed.value;
   await db
     .update(employee)
@@ -83,6 +104,30 @@ export async function updateEmployee(
       updatedAt: new Date(),
     })
     .where(eq(employee.id, id));
+
+  const salaryChanged = prev && prev.baseSalaryMonthly !== values.baseSalaryMonthly;
+  const freqChanged = prev && prev.payFrequency !== values.payFrequency;
+  if (salaryChanged || freqChanged) {
+    await db
+      .insert(employeeCompensationHistory)
+      .values({
+        employeeId: id,
+        baseSalaryMonthly: values.baseSalaryMonthly,
+        payFrequency: values.payFrequency,
+        effectiveFrom: manilaDateKey(Date.now()),
+        reason: salaryChanged && freqChanged ? "COMP_CHANGE" : salaryChanged ? "SALARY_CHANGE" : "PAY_FREQ_CHANGE",
+        changedBy: user.id,
+      })
+      .onConflictDoUpdate({
+        target: [employeeCompensationHistory.employeeId, employeeCompensationHistory.effectiveFrom],
+        set: {
+          baseSalaryMonthly: values.baseSalaryMonthly,
+          payFrequency: values.payFrequency,
+          reason: salaryChanged && freqChanged ? "COMP_CHANGE" : salaryChanged ? "SALARY_CHANGE" : "PAY_FREQ_CHANGE",
+          changedBy: user.id,
+        },
+      });
+  }
 
   revalidatePath("/employees");
   redirect(`/employees/${id}?saved=1`);

@@ -163,19 +163,34 @@ export async function createRun(periodId: number): Promise<never> {
   const [sss] = await db
     .select()
     .from(sssSchedule)
-    .where(lte(sssSchedule.effectiveFrom, period.dateTo))
+    .where(
+      and(
+        lte(sssSchedule.effectiveFrom, period.dateTo),
+        or(isNull(sssSchedule.effectiveTo), gte(sssSchedule.effectiveTo, period.dateTo)),
+      ),
+    )
     .orderBy(desc(sssSchedule.effectiveFrom))
     .limit(1);
   const [phic] = await db
     .select()
     .from(phicSchedule)
-    .where(lte(phicSchedule.effectiveFrom, period.dateTo))
+    .where(
+      and(
+        lte(phicSchedule.effectiveFrom, period.dateTo),
+        or(isNull(phicSchedule.effectiveTo), gte(phicSchedule.effectiveTo, period.dateTo)),
+      ),
+    )
     .orderBy(desc(phicSchedule.effectiveFrom))
     .limit(1);
   const [hdmf] = await db
     .select()
     .from(hdmfSchedule)
-    .where(lte(hdmfSchedule.effectiveFrom, period.dateTo))
+    .where(
+      and(
+        lte(hdmfSchedule.effectiveFrom, period.dateTo),
+        or(isNull(hdmfSchedule.effectiveTo), gte(hdmfSchedule.effectiveTo, period.dateTo)),
+      ),
+    )
     .orderBy(desc(hdmfSchedule.effectiveFrom))
     .limit(1);
   if (!sss || !phic || !hdmf) back(periodId, undefined, "Statutory tables missing — run db:seed.");
@@ -183,13 +198,23 @@ export async function createRun(periodId: number): Promise<never> {
   const [birRow] = await db
     .select({ effectiveFrom: birTaxTable.effectiveFrom })
     .from(birTaxTable)
-    .where(lte(birTaxTable.effectiveFrom, period.dateTo))
+    .where(
+      and(
+        lte(birTaxTable.effectiveFrom, period.dateTo),
+        or(isNull(birTaxTable.effectiveTo), gte(birTaxTable.effectiveTo, period.dateTo)),
+      ),
+    )
     .orderBy(desc(birTaxTable.effectiveFrom))
     .limit(1);
   const [premRow] = await db
     .select({ effectiveFrom: premiumMatrix.effectiveFrom })
     .from(premiumMatrix)
-    .where(lte(premiumMatrix.effectiveFrom, period.dateTo))
+    .where(
+      and(
+        lte(premiumMatrix.effectiveFrom, period.dateTo),
+        or(isNull(premiumMatrix.effectiveTo), gte(premiumMatrix.effectiveTo, period.dateTo)),
+      ),
+    )
     .orderBy(desc(premiumMatrix.effectiveFrom))
     .limit(1);
   if (!birRow || !premRow) back(periodId, undefined, "Tax/premium tables missing — run db:seed.");

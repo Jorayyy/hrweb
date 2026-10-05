@@ -5,7 +5,7 @@
 **Stack:** Next.js 16 (App Router) · React 19 · Drizzle ORM 0.45 · PostgreSQL (Neon) · NextAuth v5 (JWT) · Tailwind v4 · Vitest 5 · Vercel
 **Verification basis:** full source read (all 90 source files), `npm test` (49/49 pass), `tsc --noEmit` (0 errors), `eslint` (0 errors), plus authoritative-source checks (DOLE, BIR, SSS, PhilHealth, HDMF) documented in §4.
 
-> **Status 2026-10-05:** Phase 1 exit fixes applied — de minimis caps/RD_SUB (§2.8/§4 ✅), SSS effective date + source ref, `/setup` gate, dashboard role gate, net invariant, payroll state machine, 5k truncation, overnight anchor, CI. §2.8 rows for those items now reflect the fixed state; everything else unchanged.
+> **Status 2026-10-05:** Phase 1 exit fixes applied — de minimis caps/RD_SUB (§2.8/§4 ✅), SSS effective date + source ref, `/setup` gate, dashboard role gate, net invariant, payroll state machine, 5k truncation, overnight anchor, CI. §2.8 rows for those items now reflect the fixed state. **Phase 2 applied (same date):** migration `0001` (idempotent, includes `employee_compensation_history` + HIRE backfill, applied to Neon), statutory `effectiveTo` selector fix, write-on-change ledger wiring, `db:push` → `db:push:dev` + README, decision §6.1 settled (single company). Everything else unchanged.
 
 Severity = impact on payroll correctness, data integrity, security, or the stated 10k–50k scale target.
 
@@ -193,7 +193,7 @@ Existing 49 tests, the pure `calcEmployee`/`computeDay` functions, the centavo-m
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **1 (this doc)** | Audit + gap matrix + architecture review | Docs reviewed; decisions locked (see §6) |
-| **2** | DB integrity: fix statutory seed (RR 29-2025, SSS eff-date/source), add `company/site` decision, effective-dated compensation prep, migration hygiene (ban `db:push` on prod) | Migrations green; seeds cite verified sources |
+| **2 ✅ (2026-10-05)** | DB integrity: fix statutory seed (RR 29-2025, SSS eff-date/source — done in Phase 1 exit), `company/site` decision (single company), `employee_compensation_history` ledger + backfill + write-on-change, statutory `effectiveTo` selector, migration hygiene (`db:push` → `db:push:dev`) | Migrations green on Neon; seeds cite verified sources ✅ |
 | **3** | AuthZ foundation: permissions table + `requirePerm`, `/setup` gate fix, login/PIN rate limits, security headers, **audit_log wired to all mutations** | Auth matrix tests pass; every mutation audited |
 | **4** | Core HR: 201-file split (compensation history first), org assignments w/ effective dates, employee search | Salary change history auditable |
 | **5** | Scheduling: `schedule_day` materialization, rest days, rotation templates, conflict detection | Per-date schedules exist for all employees |
@@ -215,7 +215,7 @@ Existing 49 tests, the pure `calcEmployee`/`computeDay` functions, the centavo-m
 
 ## 6. Decisions needed from stakeholders
 
-1. **Multi-tenant SaaS or single-company deployment?** Determines whether `company` scoping lands in Phase 2 (cheap) or becomes a rewrite later (expensive).
+1. **Multi-tenant SaaS or single-company deployment?** Determines whether `company` scoping lands in Phase 2 (cheap) or becomes a rewrite later (expensive). **Decided 2026-10-05: single company — no tenant scoping.**
 2. **Undertime/late pay policy for fixed-salary vs daily-paid employees** (legal default exists, but company policy may be more generous — must be configurable, not hardcoded).
 3. **Background worker hosting:** separate long-running process (Railway/Fly/VPS) vs. Vercel cron chunks vs. Neon/Postgres-only loop. Payroll at 10k+ will not finish inside a serverless request.
 4. **OT authorization modes** (`AUTO` vs `MANAGER_APPROVAL`) per campaign — schema already has the column, behavior must be defined.

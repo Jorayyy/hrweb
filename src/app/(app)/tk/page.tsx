@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, gte, inArray, lte } from "drizzle-orm";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { db } from "@/db";
 import { attendanceDay, employee, shiftTemplate } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
@@ -67,7 +67,14 @@ function fieldsFor(shift: (typeof shiftTemplate.$inferSelect) | null): typeof PU
 export default async function TimekeepingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ w?: string; page?: string; emp?: string; error?: string; ok?: string }>;
+  searchParams?: Promise<{
+    w?: string;
+    page?: string;
+    emp?: string;
+    q?: string;
+    error?: string;
+    ok?: string;
+  }>;
 }) {
   await requireRole("ADMIN", "HR");
 
@@ -78,6 +85,8 @@ export default async function TimekeepingPage({
     : mondayOf(todayKey);
   const to = addDays(w, 6);
   const empFilter = /^\d+$/.test(params.emp ?? "") ? Number(params.emp) : null;
+  const qRaw = (params.q ?? "").trim();
+  const q = qRaw.toLowerCase();
   const weekLabel = (() => {
     const { year, week } = isoWeek(Date.parse(`${w}T12:00:00Z`));
     return `${year}-W${String(week).padStart(2, "0")}`;
@@ -113,7 +122,11 @@ export default async function TimekeepingPage({
   const shiftById = new Map(shifts.map((s) => [s.id, s]));
 
   const issues = emps
-    .filter((e) => empFilter === null || e.id === empFilter)
+    .filter((e) => {
+      if (empFilter !== null && e.id !== empFilter) return false;
+      if (!q) return true;
+      return `${e.firstName} ${e.lastName} ${e.employeeNo}`.toLowerCase().includes(q);
+    })
     .flatMap((emp) => {
       const empRows = byEmp.get(emp.id) ?? [];
       const byDate = new Map(empRows.map((r) => [r.workDate, r]));
@@ -140,8 +153,15 @@ export default async function TimekeepingPage({
   const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
   const pageIssues = issues.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const weekLink = (monday: string) => `/tk?w=${monday}`;
-  const pageLink = (target: number) => `/tk?w=${w}&page=${target}`;
+  const filterQs = (opts: { week?: string; page?: number } = {}): string => {
+    const qs = new URLSearchParams({ w: opts.week ?? w });
+    if (opts.page) qs.set("page", String(opts.page));
+    if (empFilter !== null) qs.set("emp", String(empFilter));
+    if (qRaw) qs.set("q", qRaw);
+    return `/tk?${qs.toString()}`;
+  };
+  const weekLink = (monday: string) => filterQs({ week: monday });
+  const pageLink = (target: number) => filterQs({ page: target });
 
   return (
     <>
@@ -179,20 +199,45 @@ export default async function TimekeepingPage({
           </div>
         ) : null}
 
-        {empFilter !== null ? (
+        {empFilter !== null || qRaw ? (
           <div className="mb-4 flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
-            <span>Filtered to one employee.</span>
-            <Link href={`/tk?w=${w}`} className="text-sm underline-offset-2 hover:underline">
-              Show all issues
+            <span className="truncate">
+              {empFilter !== null ? "Filtered to one employee" : "Showing matches"}
+              {qRaw ? ` for “${qRaw}”` : ""}.
+            </span>
+            <Link
+              href={`/tk?w=${w}`}
+              className="shrink-0 text-sm underline-offset-2 hover:underline"
+            >
+              Clear filters
             </Link>
           </div>
         ) : null}
+
+        <form method="get" className="mb-4 flex max-w-md items-center gap-2">
+          <input type="hidden" name="w" value={w} />
+          {empFilter !== null ? (
+            <input type="hidden" name="emp" value={empFilter} />
+          ) : null}
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              name="q"
+              defaultValue={qRaw}
+              placeholder="Search name or employee no."
+              className="pl-8"
+            />
+          </div>
+          <Button type="submit" variant="outline" size="sm">
+            Search
+          </Button>
+        </form>
 
         {issues.length === 0 ? (
           <Card>
             <CardContent>
               <p className="py-10 text-center text-sm text-muted-foreground">
-                No missing or flagged days this week.
+                {qRaw ? "No employees with issues match your search." : "No missing or flagged days this week."}
               </p>
             </CardContent>
           </Card>

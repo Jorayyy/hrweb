@@ -217,6 +217,9 @@ export async function punch(_prev: FormState, formData: FormData): Promise<FormS
   if (req && !slotTime(row, req)) {
     return { error: `Record your ${SLOT_LABEL[req]} punch first.` };
   }
+  if (row?.reviewedAt) {
+    return { error: "This day's DTR is approved and locked — ask HR to reopen it." };
+  }
 
   const computed = computeDay(workDate, shift, punchSet(row, slot, nowUtc));
   const isRestDay = emp.weeklyRestDays.includes(dateKeyDayOfWeek(workDate));

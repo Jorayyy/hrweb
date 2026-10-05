@@ -19,8 +19,9 @@ import {
   sssSchedule,
 } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
+import { unreviewedOffenders } from "@/lib/attendance/review";
 import { field } from "@/lib/form";
-import { manilaDateKey, manilaDayOfWeek, manilaToUtc } from "@/lib/time";
+import { isoWeek, manilaDateKey, manilaDayOfWeek, manilaToUtc } from "@/lib/time";
 import {
   calcEmployee,
   type DayInput,
@@ -41,22 +42,15 @@ const ALLOWED: Record<string, readonly string[]> = {
   void: ["OPEN", "CUT_OFF", "CALCULATING", "CALCULATED", "REVIEW", "APPROVED"],
 };
 
-const pad = (n: number) => String(n).padStart(2, "0");
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
 
 function back(periodId: number, runId?: number, error?: string): never {
   const qs = new URLSearchParams({ period: String(periodId) });
   if (runId) qs.set("run", String(runId));
   if (error) qs.set("error", error);
   redirect(`/payroll?${qs.toString()}`);
-}
-
-function isoWeek(ms: number): { year: number; week: number } {
-  const d = new Date(ms);
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
-  const year = d.getUTCFullYear();
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  jan4.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + 3);
-  return { year, week: 1 + Math.round((d.getTime() - jan4.getTime()) / (7 * DAY_MS)) };
 }
 
 async function upsertPeriod(values: {
@@ -330,12 +324,22 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
       ? (["WEEKLY", "DAILY"] as const)
       : (["SEMI_MONTHLY", "MONTHLY"] as const);
 
+  if (period.dateTo >= manilaDateKey(Date.now()))
+    back(
+      periodId,
+      runId,
+      `This cutoff has not ended yet (ends ${period.dateTo}) — calculate after the period ends.`,
+    );
+
   const emps = await db
     .select({
       id: employee.id,
+      employeeNo: employee.employeeNo,
       baseSalaryMonthly: employee.baseSalaryMonthly,
       payFrequency: employee.payFrequency,
       isMinimumWageExempt: employee.isMinimumWageExempt,
+      dateHired: employee.dateHired,
+      weeklyRestDays: employee.weeklyRestDays,
     })
     .from(employee)
     .where(
@@ -376,6 +380,16 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
         gte(attendanceDay.workDate, period.dateFrom),
         lte(attendanceDay.workDate, period.dateTo),
       ),
+    );
+
+  const offenders = unreviewedOffenders(emps, period, dayRows);
+  if (offenders.length > 0)
+    back(
+      periodId,
+      runId,
+      `DTR not approved for ${offenders.length} employee${offenders.length === 1 ? "" : "s"}` +
+        ` (${offenders.slice(0, 3).join(", ")}${offenders.length > 3 ? ", …" : ""}).` +
+        " Approve the missing weeks in DTR Review before calculating.",
     );
 
   const cfg: StatConfig = {

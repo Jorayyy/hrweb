@@ -22,6 +22,20 @@
       "when": 1791177210231,
       "tag": "0002_good_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791178944697,
+      "tag": "0003_icy_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791178972625,
+      "tag": "0004_faithful_deadpool",
+      "breakpoints": true
     }
   ]
 }

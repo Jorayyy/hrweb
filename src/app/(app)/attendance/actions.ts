@@ -76,6 +76,20 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
     .limit(1);
   if (!emp) return { errors: { employeeId: "Employee not found." } };
 
+  // ponytail: check-then-write TOCTOU window of one round trip — fine for HR traffic
+  const [existing] = await db
+    .select({ reviewedAt: attendanceDay.reviewedAt })
+    .from(attendanceDay)
+    .where(
+      and(eq(attendanceDay.employeeId, employeeId as number), eq(attendanceDay.workDate, workDate)),
+    )
+    .limit(1);
+  if (existing?.reviewedAt) {
+    return {
+      errors: { workDate: "This day is approved — reopen it in DTR Review before editing." },
+    };
+  }
+
   const shift = emp.shiftTemplateId
     ? ((await db
         .select()

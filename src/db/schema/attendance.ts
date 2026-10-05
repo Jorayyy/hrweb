@@ -12,6 +12,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { holidayKind } from "./config";
+import { users } from "./org";
 
 /** Durations are INTEGER SECONDS. Monetary values are INTEGER CENTAVOS. */
 
@@ -79,6 +80,8 @@ export const attendanceDay = pgTable(
 
     needsReview: boolean("needs_review").notNull().default(false),
     reviewNote: text("review_note"),
+    reviewedBy: text("reviewed_by").references(() => users.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     ruleVersion: text("rule_version").notNull(),
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
   },

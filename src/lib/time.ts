@@ -40,6 +40,16 @@ export function manilaDayOfWeek(utcMs: number): number {
   return new Date(utcMs + MANILA_OFFSET_MS).getUTCDay();
 }
 
+/** ISO-8601 week number (week 1 contains the year's first Thursday). */
+export function isoWeek(utcMs: number): { year: number; week: number } {
+  const d = new Date(utcMs);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
+  const year = d.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  jan4.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7) + 3);
+  return { year, week: 1 + Math.round((d.getTime() - jan4.getTime()) / (7 * DAY_MS)) };
+}
+
 /**
  * Seconds of [startMs, endMs) that fall between 22:00 and 06:00 Manila time,
  * minus any supplied unpaid meal windows. Crosses any number of midnights.

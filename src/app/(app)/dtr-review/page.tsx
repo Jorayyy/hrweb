@@ -31,6 +31,7 @@ import {
 import { approveWeek, reopenWeek } from "./actions";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PAGE_SIZE = 25;
 
 function nowKey(): string {
   return manilaDateKey(Date.now());
@@ -48,7 +49,7 @@ function hours(seconds: number): string {
 export default async function DtrReviewPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ w?: string; error?: string; ok?: string }>;
+  searchParams?: Promise<{ w?: string; page?: string; error?: string; ok?: string }>;
 }) {
   await requireRole("ADMIN", "HR");
 
@@ -122,7 +123,12 @@ export default async function DtrReviewPage({
   const readyCount = tableRows.filter((t) => t.readiness.ready && !t.readiness.approved).length;
   const actionsEnabled = weekOver && readyCount > 0;
 
+  const pages = Math.max(1, Math.ceil(tableRows.length / PAGE_SIZE));
+  const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
+  const pageRows = tableRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const weekLink = (monday: string) => `/dtr-review?w=${monday}`;
+  const pageLink = (target: number) => `/dtr-review?w=${w}&page=${target}`;
 
   return (
     <>
@@ -192,7 +198,7 @@ export default async function DtrReviewPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tableRows.map(({ emp, byDate, requiredSet, readiness, totals }) => (
+                  {pageRows.map(({ emp, byDate, requiredSet, readiness, totals }) => (
                     <TableRow key={emp.id}>
                       <TableCell>
                         <Link href={`/employees/${emp.id}`} className="hover:underline">
@@ -330,6 +336,26 @@ export default async function DtrReviewPage({
                 </TableBody>
               </Table>
             </div>
+
+            {pages > 1 ? (
+              <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
+                <span className="text-muted-foreground">
+                  Page {page} of {pages} · {tableRows.length} employees
+                </span>
+                <div className="flex gap-2">
+                  {page > 1 ? (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={pageLink(page - 1)}>Previous</a>
+                    </Button>
+                  ) : null}
+                  {page < pages ? (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={pageLink(page + 1)}>Next</a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
               Missing = required day with no record (rest days and pre-hire dates excluded) —

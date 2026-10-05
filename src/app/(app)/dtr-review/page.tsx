@@ -120,8 +120,10 @@ export default async function DtrReviewPage({
   });
 
   const approvedCount = tableRows.filter((t) => t.readiness.approved).length;
-  const readyCount = tableRows.filter((t) => t.readiness.ready && !t.readiness.approved).length;
-  const actionsEnabled = weekOver && readyCount > 0;
+  const approvableCount = tableRows.filter(
+    (t) => t.readiness.flagged.length === 0 && !t.readiness.approved,
+  ).length;
+  const actionsEnabled = weekOver && approvableCount > 0;
 
   const pages = Math.max(1, Math.ceil(tableRows.length / PAGE_SIZE));
   const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
@@ -154,7 +156,7 @@ export default async function DtrReviewPage({
           <form action={approveWeek}>
             <input type="hidden" name="w" value={w} />
             <Button type="submit" size="sm" disabled={!actionsEnabled}>
-              Approve all ready ({readyCount})
+              Approve all ({approvableCount})
             </Button>
           </form>
         </div>
@@ -187,16 +189,16 @@ export default async function DtrReviewPage({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-44">Employee</TableHead>
+                    <TableHead>Employee</TableHead>
                     {dates.map((d) => (
-                      <TableHead key={d} className="min-w-24 text-center">
+                      <TableHead key={d} className="text-center">
                         {DAY_SHORT[dateKeyDayOfWeek(d)]} {d.slice(8)}
                       </TableHead>
                     ))}
                     <TableHead className="text-right">Worked h</TableHead>
                     <TableHead className="text-right">Late</TableHead>
                     <TableHead className="text-right">OT h</TableHead>
-                    <TableHead className="min-w-32">Status</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -222,7 +224,7 @@ export default async function DtrReviewPage({
                           return (
                             <TableCell
                               key={d}
-                              className={`text-center align-top text-xs ${
+                              className={`whitespace-normal text-center align-top text-xs ${
                                 required
                                   ? "border border-dashed border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300"
                                   : "text-muted-foreground"
@@ -240,7 +242,7 @@ export default async function DtrReviewPage({
                         return (
                           <TableCell
                             key={d}
-                            className={`align-top text-xs ${
+                            className={`whitespace-normal align-top text-xs ${
                               row.reviewedAt
                                 ? "bg-emerald-50 dark:bg-emerald-950/30"
                                 : "bg-background"
@@ -289,26 +291,31 @@ export default async function DtrReviewPage({
                       <TableCell>
                         {requiredSet.size === 0 ? (
                           <Badge variant="outline">N/A</Badge>
-                        ) : !weekOver ? (
-                          <span className="text-xs text-muted-foreground">In progress</span>
                         ) : readiness.approved ? (
                           <Badge className="bg-emerald-600 hover:bg-emerald-600">Approved</Badge>
-                        ) : readiness.ready ? (
-                          <Badge variant="secondary">Ready</Badge>
-                        ) : readiness.missing.length > 0 ? (
-                          <Link
-                            href={`/attendance?date=${readiness.missing[0]}`}
-                            className="text-xs text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
-                          >
-                            {readiness.missing.length} missing →
-                          </Link>
+                        ) : readiness.missing.length > 0 || readiness.flagged.length > 0 ? (
+                          <span className="flex flex-col items-start gap-0.5 text-xs">
+                            {readiness.missing.length > 0 ? (
+                              <Link
+                                href={`/tk?w=${w}&emp=${emp.id}`}
+                                className="text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+                              >
+                                {readiness.missing.length} missing →
+                              </Link>
+                            ) : null}
+                            {readiness.flagged.length > 0 ? (
+                              <Link
+                                href={`/tk?w=${w}&emp=${emp.id}`}
+                                className="text-rose-700 underline-offset-2 hover:underline dark:text-rose-400"
+                              >
+                                {readiness.flagged.length} flagged →
+                              </Link>
+                            ) : null}
+                          </span>
+                        ) : !weekOver ? (
+                          <span className="text-xs text-muted-foreground">In progress</span>
                         ) : (
-                          <Link
-                            href={`/attendance?date=${readiness.flagged[0]}`}
-                            className="text-xs text-rose-700 underline-offset-2 hover:underline dark:text-rose-400"
-                          >
-                            {readiness.flagged.length} flagged →
-                          </Link>
+                          <Badge variant="secondary">Ready</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -327,9 +334,11 @@ export default async function DtrReviewPage({
                             <Button
                               type="submit"
                               size="sm"
-                              disabled={!weekOver || !readiness.ready}
+                              disabled={!weekOver || readiness.flagged.length > 0}
                             >
-                              Approve
+                              {readiness.missing.length > 0
+                                ? `Approve (${readiness.missing.length} absent)`
+                                : "Approve"}
                             </Button>
                           </form>
                         )}
@@ -362,9 +371,10 @@ export default async function DtrReviewPage({
 
             <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
               Missing = required day with no record (rest days and pre-hire dates excluded) —
-              backfill it in Attendance. Flagged = incomplete punch or anomaly to fix. Approved
-              days are locked until reopened; payroll cannot calculate until every required day
-              is approved.
+              approving marks those days absent; if the employee was actually present, fix the
+              punches in Timekeeping (TK) first. Flagged = wrong or incomplete punch — must be
+              fixed in TK before approval. Approved days are locked until reopened; payroll
+              cannot calculate until every required day is approved.
             </p>
           </CardContent>
         </Card>

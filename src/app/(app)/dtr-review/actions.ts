@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { addDays, mondayOf, requiredDates, weekReadiness } from "@/lib/attendance/review";
 import { field, isIsoDate } from "@/lib/form";
 import { manilaDateKey } from "@/lib/time";
+import { saveAttendanceDay } from "../attendance/actions";
 
 function back(w: string, error?: string, ok?: string): never {
   const qs = new URLSearchParams({ w });
@@ -30,6 +31,21 @@ const EMP_FIELDS = {
   dateHired: employee.dateHired,
   weeklyRestDays: employee.weeklyRestDays,
 } as const;
+
+async function markAbsentDays(
+  employeeId: number,
+  dates: readonly string[],
+): Promise<string | null> {
+  for (const d of dates) {
+    const fd = new FormData();
+    fd.set("employeeId", String(employeeId));
+    fd.set("workDate", d);
+    fd.set("status", "ABSENT");
+    const res = await saveAttendanceDay(null, fd);
+    if (res?.errors) return Object.values(res.errors).join(" ");
+  }
+  return null;
+}
 
 export async function approveWeek(formData: FormData): Promise<never> {
   const user = await requireRole("ADMIN", "HR");
@@ -58,13 +74,13 @@ export async function approveWeek(formData: FormData): Promise<never> {
       requiredDates({ from: w, to, dateHired: emp.dateHired, weeklyRestDays: emp.weeklyRestDays }),
       rows,
     );
-    if (r.missing.length > 0)
+    if (r.flagged.length > 0)
       back(
         w,
-        `Missing DTR for ${emp.employeeNo} on ${r.missing.join(", ")} — add those days in Attendance first.`,
+        `Flagged days must be fixed first in Timekeeping (TK): ${r.flagged.join(", ")}.`,
       );
-    if (r.flagged.length > 0)
-      back(w, `Flagged days must be fixed first: ${r.flagged.join(", ")}.`);
+    const absentErr = await markAbsentDays(empId, r.missing);
+    if (absentErr) back(w, absentErr);
 
     await db
       .update(attendanceDay)
@@ -76,7 +92,14 @@ export async function approveWeek(formData: FormData): Promise<never> {
           lte(attendanceDay.workDate, to),
         ),
       );
-    back(w, undefined, `Approved week for ${emp.employeeNo}.`);
+    back(
+      w,
+      undefined,
+      `Approved week for ${emp.employeeNo}.` +
+        (r.missing.length > 0
+          ? ` ${r.missing.length} missing day${r.missing.length === 1 ? "" : "s"} marked absent.`
+          : ""),
+    );
   }
 
   const emps = await db
@@ -99,12 +122,24 @@ export async function approveWeek(formData: FormData): Promise<never> {
   }
 
   const ready: number[] = [];
+  let absentDays = 0;
+  let flaggedSkipped = 0;
   for (const emp of emps) {
     const r = weekReadiness(
       requiredDates({ from: w, to, dateHired: emp.dateHired, weeklyRestDays: emp.weeklyRestDays }),
       byEmp.get(emp.id) ?? [],
     );
-    if (r.ready && !r.approved) ready.push(emp.id);
+    if (r.approved) continue;
+    if (r.flagged.length > 0) {
+      flaggedSkipped++;
+      continue;
+    }
+    if (r.missing.length > 0) {
+      const err = await markAbsentDays(emp.id, r.missing);
+      if (err) back(w, `${emp.employeeNo}: ${err}`);
+      absentDays += r.missing.length;
+    }
+    ready.push(emp.id);
   }
 
   if (ready.length > 0) {
@@ -120,12 +155,17 @@ export async function approveWeek(formData: FormData): Promise<never> {
       );
   }
 
-  const skipped = emps.length - ready.length;
   back(
     w,
     undefined,
     `Approved ${ready.length} week${ready.length === 1 ? "" : "s"}` +
-      (skipped > 0 ? ` — ${skipped} skipped (missing or flagged days).` : "."),
+      (absentDays > 0
+        ? ` · ${absentDays} missing day${absentDays === 1 ? "" : "s"} marked absent`
+        : "") +
+      (flaggedSkipped > 0
+        ? ` · ${flaggedSkipped} skipped (flagged days — fix in Timekeeping)`
+        : "") +
+      ".",
   );
 }
 

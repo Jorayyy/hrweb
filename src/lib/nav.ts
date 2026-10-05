@@ -18,6 +18,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/payslips", label: "My Payslips", icon: "wallet", roles: ["EMPLOYEE"] },
   { href: "/employees", label: "Employees", icon: "users", roles: ["ADMIN", "HR"] },
   { href: "/attendance", label: "Attendance", icon: "clock", roles: ["ADMIN", "HR"] },
+  { href: "/tk", label: "TK", icon: "clock", roles: ["ADMIN", "HR"] },
   { href: "/dtr-review", label: "DTR Review", icon: "clock", roles: ["ADMIN", "HR"] },
   { href: "/schedule", label: "Schedule", icon: "calendar", roles: ["ADMIN", "HR"] },
   { href: "/payroll", label: "Payroll", icon: "wallet", roles: ["ADMIN", "PAYROLL"] },

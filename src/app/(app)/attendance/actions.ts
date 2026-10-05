@@ -98,6 +98,7 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
         .limit(1))[0] ?? null)
     : null;
 
+  const incomplete = status === "INCOMPLETE_PUNCH";
   const inMs = times.punchIn ? utcAt(workDate, times.punchIn) : null;
   const roll = (hhmm: string): Date | null => {
     if (!hhmm) return null;
@@ -143,14 +144,18 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
     };
     const c = computeDay(workDate, shift, punches);
     scheduledSeconds = c.scheduledSeconds;
-    workedSeconds = c.workedSeconds;
-    lateSeconds = c.lateSeconds;
-    undertimeSeconds = c.undertimeSeconds;
-    otSeconds = c.otWorkedSeconds;
-    nightSeconds = c.nightSeconds;
-    nightOtSeconds = c.nightOtSeconds;
-    paidBreakSeconds = c.paidBreakSeconds;
-    computedNote = c.reviewNote;
+    // Unpaid/non-punched statuses (ABSENT, LEAVE, ...) keep schedule only —
+    // punch-variance notes would wrongly flag a day nobody was expected to punch.
+    if (PUNCHED.includes(status as Status) || incomplete) {
+      workedSeconds = c.workedSeconds;
+      lateSeconds = c.lateSeconds;
+      undertimeSeconds = c.undertimeSeconds;
+      otSeconds = c.otWorkedSeconds;
+      nightSeconds = c.nightSeconds;
+      nightOtSeconds = c.nightOtSeconds;
+      paidBreakSeconds = c.paidBreakSeconds;
+      computedNote = c.reviewNote;
+    }
   } else {
     // No shift assigned — legacy in/out math against the manual schedule hours.
     const startMs = utcAt(workDate, `${String(START_HOUR).padStart(2, "0")}:00`);
@@ -194,7 +199,6 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
   const presenceBeforeHoliday =
     prev.length === 0 || !UNPAID.includes(prev[0].status as Status);
 
-  const incomplete = status === "INCOMPLETE_PUNCH";
   const values = {
     employeeId: employeeId as number,
     workDate,

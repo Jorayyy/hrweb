@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, count, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   allowanceType,
@@ -76,9 +76,59 @@ async function upsertPeriod(values: {
   return existing.id;
 }
 
+async function lastDtrGateError(frequency: "WEEKLY" | "SEMI_MONTHLY"): Promise<string | null> {
+  const today = manilaDateKey(Date.now());
+  const [last] = await db
+    .select()
+    .from(payrollPeriod)
+    .where(and(eq(payrollPeriod.frequency, frequency), lt(payrollPeriod.dateTo, today)))
+    .orderBy(desc(payrollPeriod.dateTo))
+    .limit(1);
+  if (!last) return null;
+
+  const payFamily =
+    frequency === "WEEKLY"
+      ? (["WEEKLY", "DAILY"] as const)
+      : (["SEMI_MONTHLY", "MONTHLY"] as const);
+  const emps = await db
+    .select({ id: employee.id, employeeNo: employee.employeeNo, dateHired: employee.dateHired, weeklyRestDays: employee.weeklyRestDays })
+    .from(employee)
+    .where(
+      and(
+        inArray(employee.status, ["ACTIVE", "ON_LEAVE"]),
+        inArray(employee.payFrequency, payFamily),
+      ),
+    );
+  if (emps.length === 0) return null;
+
+  const dayRows = await db
+    .select()
+    .from(attendanceDay)
+    .where(
+      and(
+        inArray(attendanceDay.employeeId, emps.map((e) => e.id)),
+        gte(attendanceDay.workDate, last.dateFrom),
+        lte(attendanceDay.workDate, last.dateTo),
+      ),
+    );
+  const offenders = unreviewedOffenders(emps, last, dayRows);
+  if (offenders.length === 0) return null;
+  return (
+    `DTR not approved for ${offenders.length} employee${offenders.length === 1 ? "" : "s"}` +
+    ` (${offenders.slice(0, 3).join(", ")}${offenders.length > 3 ? ", …" : ""}).` +
+    ` Approve the missing days in DTR Review before opening a cutoff (last ${frequency.toLowerCase()} cutoff ${last.periodCode} is not clean).`
+  );
+}
+
 export async function openPeriod(formData: FormData): Promise<never> {
   await requireRole("ADMIN", "PAYROLL");
   const frequency = field(formData, "frequency");
+
+  if (frequency !== "WEEKLY" && frequency !== "SEMI_MONTHLY") {
+    redirect("/payroll?error=Choose a cutoff frequency.");
+  }
+  const gateError = await lastDtrGateError(frequency);
+  if (gateError) redirect(`/payroll?error=${encodeURIComponent(gateError)}`);
 
   if (frequency === "WEEKLY") {
     const now = Date.now();
@@ -98,10 +148,6 @@ export async function openPeriod(formData: FormData): Promise<never> {
       frequency: "WEEKLY",
     });
     back(id);
-  }
-
-  if (frequency !== "SEMI_MONTHLY") {
-    redirect("/payroll?error=Choose a cutoff frequency.");
   }
 
   const [y, m, d] = todayParts();

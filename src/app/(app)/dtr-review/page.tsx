@@ -139,6 +139,9 @@ export default async function DtrReviewPage({
       >
         <div className="flex items-center gap-1">
           <Button asChild variant="outline" size="sm">
+            <Link href="/payroll">Payroll</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
             <Link href={weekLink(addDays(w, -7))} aria-label="Previous week">
               <ChevronLeft className="size-4" />
             </Link>

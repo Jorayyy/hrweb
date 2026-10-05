@@ -1,20 +1,25 @@
-import { and, eq } from "drizzle-orm";
+import Link from "next/link";
+import { and, eq, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { campaign, employee, jobPosition, payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
-import { requireRole } from "@/lib/auth";
+import { selfEmployee } from "@/lib/auth";
 import { formatDate } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { PayslipView, type PayslipPerson } from "@/components/payslip-view";
 
-export default async function PayslipPage({
+export default async function PayslipDetailPage({
   params,
 }: {
-  params: Promise<{ runId: string; employeeId: string }>;
+  params: Promise<{ runId: string }>;
 }) {
-  await requireRole("ADMIN", "PAYROLL");
-  const { runId, employeeId } = await params;
+  const { employeeId } = await selfEmployee();
+  if (!employeeId) notFound();
+
+  const { runId: rawRunId } = await params;
+  const runId = Number(rawRunId);
+  if (!Number.isInteger(runId)) notFound();
 
   const [row] = await db
     .select({
@@ -41,7 +46,11 @@ export default async function PayslipPage({
     .innerJoin(jobPosition, eq(employee.positionId, jobPosition.id))
     .innerJoin(campaign, eq(employee.campaignId, campaign.id))
     .where(
-      and(eq(payrollRunItem.runId, Number(runId)), eq(payrollRunItem.employeeId, Number(employeeId))),
+      and(
+        eq(payrollRunItem.runId, runId),
+        eq(payrollRunItem.employeeId, employeeId),
+        inArray(payrollRun.status, ["APPROVED", "POSTED"]),
+      ),
     )
     .limit(1);
 
@@ -62,7 +71,6 @@ export default async function PayslipPage({
     philhealthNo: row.philhealthNo,
     pagibigNo: row.pagibigNo,
   };
-  const backHref = `/payroll?period=${run.periodId}&run=${run.id}`;
 
   return (
     <>
@@ -70,9 +78,9 @@ export default async function PayslipPage({
         title={`Payslip — ${row.lastName}, ${row.firstName}`}
         description={`${period.periodCode} · run #${run.runNo} · pay date ${formatDate(period.payDate)}`}
       >
-        <a href={backHref} className="text-sm text-muted-foreground hover:underline">
-          ← Back to register
-        </a>
+        <Link href="/payslips" className="text-sm text-muted-foreground hover:underline">
+          ← Back to payslips
+        </Link>
         <StatusBadge status={run.status} />
       </PageHeader>
 

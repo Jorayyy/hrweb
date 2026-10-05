@@ -13,6 +13,9 @@ const ALL: readonly UserRole[] = ["ADMIN", "HR", "PAYROLL", "EMPLOYEE"];
 
 export const NAV: readonly NavItem[] = [
   { href: "/", label: "Dashboard", icon: "dashboard", roles: ALL },
+  { href: "/profile", label: "My Profile", icon: "users", roles: ["EMPLOYEE"] },
+  { href: "/dtr", label: "My DTR", icon: "clock", roles: ["EMPLOYEE"] },
+  { href: "/payslips", label: "My Payslips", icon: "wallet", roles: ["EMPLOYEE"] },
   { href: "/employees", label: "Employees", icon: "users", roles: ["ADMIN", "HR"] },
   { href: "/attendance", label: "Attendance", icon: "clock", roles: ["ADMIN", "HR"] },
   { href: "/schedule", label: "Schedule", icon: "calendar", roles: ["ADMIN", "HR"] },

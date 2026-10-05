@@ -46,3 +46,14 @@ export async function requireRole(...roles: UserRole[]) {
   if (roles.length > 0 && !roles.includes(user.role)) redirect("/");
   return user;
 }
+
+/** Session user + their linked employee id (null = profile not linked to an employee). */
+export async function selfEmployee() {
+  const user = await requireRole();
+  const [acct] = await db
+    .select({ employeeId: users.employeeId })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+  return { user, employeeId: acct?.employeeId ?? null };
+}

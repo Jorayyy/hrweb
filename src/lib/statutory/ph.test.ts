@@ -228,18 +228,24 @@ describe("seed data", () => {
     expect(HOLIDAYS_2026.every((h) => h.date.startsWith("2026-"))).toBe(true);
   });
 
-  it("holds every de minimis benefit to its BIR ceiling", () => {
+  it("caps de minimis benefits at the RR 29-2025 ceilings", () => {
     const byCode = Object.fromEntries(ALLOWANCE_TYPES_2026.map((a) => [a.code, a]));
-    expect(byCode.RICE.monthlyCap).toBe(150000);
-    expect(byCode.CLOTHING.annualCap).toBe(600000);
-    expect(byCode.MEDICAL.annualCap).toBe(1000000);
-    expect(byCode.LAUNDRY.monthlyCap).toBe(30000);
-    expect(byCode.GIFT.annualCap).toBe(900000);
-    expect(byCode.ACHIEVE.annualCap).toBe(1000000);
-    expect(byCode.RD_SUB.monthlyCap).toBe(100000);
+    expect(byCode.RICE.monthlyCap).toBe(250000);
+    expect(byCode.CLOTHING.annualCap).toBe(800000);
+    expect(byCode.MEDICAL.annualCap).toBe(1200000);
+    expect(byCode.LAUNDRY.monthlyCap).toBe(40000);
+    expect(byCode.GIFT.annualCap).toBe(600000);
+    expect(byCode.ACHIEVE.annualCap).toBe(1200000);
+    expect(byCode.RD_SUB.taxable).toBe(true);
     expect(ALLOWANCE_TYPES_2026.filter((a) => a.taxable).map((a) => a.code)).toEqual([
+      "RD_SUB",
       "PERF_BONUS",
       "COLA",
     ]);
+  });
+
+  it("anchors the SSS schedule to its real effective date", () => {
+    expect(SSS_2026.effectiveFrom).toBe("2025-01-01");
+    expect(SSS_2026.sourceRef).not.toContain("Proclamation");
   });
 });

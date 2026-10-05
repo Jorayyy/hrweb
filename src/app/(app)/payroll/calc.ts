@@ -248,7 +248,6 @@ export function calcEmployee(
 
   const totalDeductions = statutoryEe + birTax;
   const rawNet = grossPay - totalDeductions;
-  const netPay = Math.max(0, rawNet);
   const totalEmployer = sssEr + sssWispEr + phicEr + hdmfEr;
 
   return {
@@ -277,7 +276,7 @@ export function calcEmployee(
     taxablePay,
     totalDeductions,
     totalEmployer,
-    netPay,
+    netPay: rawNet,
     sssEe,
     sssEr,
     sssWispEe,

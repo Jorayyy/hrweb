@@ -17,7 +17,7 @@ export const PAY_FREQUENCY_PERIODS: Record<PayFrequency, number> = {
 };
 
 export const SSS_2026 = {
-  effectiveFrom: "2026-01-01",
+  effectiveFrom: "2025-01-01",
   totalRate: 0.15,
   eeRate: 0.05,
   erRate: 0.1,
@@ -28,7 +28,7 @@ export const SSS_2026 = {
   ecThreshold: 1500000,
   ecAmountLow: 1000,
   ecAmountHigh: 3000,
-  sourceRef: "RA 11199; SSS Schedule of Contributions effective 01 Jan 2026 (Prov. Proc. 1006 s.2025 era circular)",
+  sourceRef: "RA 11199; SSS Schedule of Contributions effective 01 Jan 2025 (in force for 2026)",
 };
 export type SssConfig = typeof SSS_2026;
 
@@ -39,7 +39,7 @@ export const PHIC_2026 = {
   baseCeiling: 10000000,
   eeShare: 0.5,
   erShare: 0.5,
-  sourceRef: "RA 11223 IRR; PhilHealth premium 5.00% (EE 2.50% / ER 2.50%), 2026",
+  sourceRef: "RA 11223 IRR; PhilHealth advisory 06 May 2025 (final scheduled rate 5.00%)",
 };
 export type PhicConfig = typeof PHIC_2026;
 
@@ -49,7 +49,7 @@ export const HDMF_2026 = {
   erRate: 0.02,
   compCeiling: 1000000,
   maxContribution: 20000,
-  sourceRef: "RA 9679; HDMF 2% EE + 2% ER on first ₱10,000, 2026",
+  sourceRef: "RA 9679; HDMF Circular No. 460 (s. 2024): 2% EE + 2% ER on first ₱10,000",
 };
 export type HdmfConfig = typeof HDMF_2026;
 
@@ -131,15 +131,16 @@ export type AllowanceSeed = {
   isFixed: boolean;
 };
 
+// Ceilings per RR No. 29-2025 (issued 22 Dec 2025, effective 06 Jan 2026).
 export const ALLOWANCE_TYPES_2026: readonly AllowanceSeed[] = [
-  { code: "RICE", name: "Rice subsidy", taxable: false, monthlyCap: 150000, annualCap: null, isFixed: true },
-  { code: "CLOTHING", name: "Uniform / clothing allowance", taxable: false, monthlyCap: 50000, annualCap: 600000, isFixed: true },
-  { code: "MEDICAL", name: "Medical / hospitalization reimbursement", taxable: false, monthlyCap: null, annualCap: 1000000, isFixed: false },
-  { code: "LAUNDRY", name: "Laundry allowance", taxable: false, monthlyCap: 30000, annualCap: null, isFixed: true },
+  { code: "RICE", name: "Rice subsidy", taxable: false, monthlyCap: 250000, annualCap: null, isFixed: true },
+  { code: "CLOTHING", name: "Uniform / clothing allowance", taxable: false, monthlyCap: null, annualCap: 800000, isFixed: true },
+  { code: "MEDICAL", name: "Medical / hospitalization reimbursement", taxable: false, monthlyCap: null, annualCap: 1200000, isFixed: false },
+  { code: "LAUNDRY", name: "Laundry allowance", taxable: false, monthlyCap: 40000, annualCap: null, isFixed: true },
   { code: "MEAL", name: "Meal / daytime allowance", taxable: false, monthlyCap: null, annualCap: null, isFixed: true },
-  { code: "GIFT", name: "Gift on major milestone", taxable: false, monthlyCap: null, annualCap: 900000, isFixed: false },
-  { code: "ACHIEVE", name: "Achievement award (tangible, non-cash)", taxable: false, monthlyCap: null, annualCap: 1000000, isFixed: false },
-  { code: "RD_SUB", name: "Representation allowance", taxable: false, monthlyCap: 100000, annualCap: null, isFixed: true },
+  { code: "GIFT", name: "Gift on major milestone", taxable: false, monthlyCap: null, annualCap: 600000, isFixed: false },
+  { code: "ACHIEVE", name: "Achievement award (tangible, non-cash)", taxable: false, monthlyCap: null, annualCap: 1200000, isFixed: false },
+  { code: "RD_SUB", name: "Representation allowance", taxable: true, monthlyCap: null, annualCap: null, isFixed: true },
   { code: "PERF_BONUS", name: "Performance / productivity bonus", taxable: true, monthlyCap: null, annualCap: null, isFixed: false },
   { code: "COLA", name: "Cost-of-living allowance", taxable: true, monthlyCap: null, annualCap: null, isFixed: true },
 ];

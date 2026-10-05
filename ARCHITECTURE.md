@@ -1176,17 +1176,17 @@ CREATE TABLE premium_matrix (
 | # | Holiday kind | Rest day? | Worked? | 1st 8 h | OT hourly | Unworked pay |
 |---|---|---|---|---|---|---|
 | 1 | Ordinary | no | yes | **100%** | 125% | n/a (absent / LWP) |
-| 2 | Ordinary | yes | yes | **130%** | 130% | n/a |
+| 2 | Ordinary | yes | yes | **130%** | 169% | n/a |
 | 3 | Regular | no | yes | **200%** | 260% | — |
 | 4 | Regular | no | no | — | — | **100%** |
-| 5 | Regular | yes | yes | **260%** | 260% | — |
+| 5 | Regular | yes | yes | **260%** | 338% | — |
 | 6 | Regular | yes | no | — | — | **100%** |
-| 7 | Special NW | no | yes | **130%** | 130% | — |
+| 7 | Special NW | no | yes | **130%** | 169% | — |
 | 8 | Special NW | no | no | — | — | **0%** (no work, no pay) |
-| 9 | Special NW | yes | yes | **150%** | 150% | — |
+| 9 | Special NW | yes | yes | **150%** | 195% | — |
 | 10 | Special NW | yes | no | — | — | **0%** |
 
-> Rows 9/10 (Special NW falling on a rest day) and the OT columns are the most frequently contested combinations. Populate from the **current DOLE Handbook** and obtain counsel sign-off. The engine applies whatever is stored — a change of law is a data migration, not a code change.
+> OT stacking per DOLE Labor Advisory No. 12-25 (s. 2025): rest-day/special-day OT = day rate × 130% (e.g. special day OT 130% × 130% = 169%; regular holiday on rest day 200% × 130% × 130% = 338%). Rows 5/9 (day falling on a rest day) and the OT columns are the most frequently contested combinations — populate from the **current DOLE Handbook** and obtain counsel sign-off. The engine applies whatever is stored — a change of law is a data migration, not a code change.
 
 **Application logic**
 
@@ -1243,7 +1243,7 @@ All three social-insurance computations share one shape: statutory base → clam
 ```python
 def compute_sss(monthly_basic, sched, proration=1.0):
     # 1. Map to Monthly Salary Credit (MSC)
-    msc = clamp(ceil_to_step(monthly_basic, sched.msc_step), sched.msc_min, sched.msc_max)
+    msc = clamp(round_to_step_half_up(monthly_basic, sched.msc_step), sched.msc_min, sched.msc_max)
     br  = sched.bracket_for(msc)               # precomputed amounts, no runtime drift
 
     ee_total = round2(br.ee_amount * proration)   # 5% of MSC
@@ -1273,7 +1273,7 @@ def compute_sss(monthly_basic, sched, proration=1.0):
 |---|---|---|
 | Total contribution rate | **15%** of MSC | RA 11199 gradual schedule |
 | EE share / ER share | **5% / 10%** of MSC | RA 11199 |
-| MSC bracket range & step | e.g. 3,500–35,000 in ₱500 steps (verify current Circular) | SSS Contribution Schedule |
+| MSC bracket range & step | e.g. 5,000–35,000 in ₱500 steps (schedule effective 01 Jan 2025; verify current Circular) | SSS Contribution Schedule |
 | WISP threshold | MSC above **₱20,000** → excess allocated to WISP | SSS WISP rules |
 | WISP Plus | optional voluntary top-up, separate deduction code `SSS_WISPPLUS` | SSS WISP Plus program |
 | Basis | **monthly basic salary**, not gross; allowances excluded | SSS Circular |
@@ -1391,16 +1391,18 @@ Verification: the engine's derivation path and this table must agree within ±�
 
 Separation happens at the **allowance definition** level (`allowance_type.taxable`), not at calculation time. The payroll engine never branches on allowance names.
 
+Ceilings below are per **RR No. 29-2025** (issued 22 Dec 2025, effective 06 Jan 2026).
+
 | Code | Benefit | Taxable? | Ceiling / basis | Source |
 |---|---|---|---|---|
-| `RICE` | Rice subsidy | **No** | ₱1,500 / month per employee | BIR de minimis |
-| `CLOTHING` | Uniform / clothing allowance | **No** | ₱6,000 / year (₱500 / month) | BIR de minimis |
-| `MEDICAL` | Medical / hospitalization reimbursement | **No** | ₱10,000 / year, actual & substantiated | BIR de minimis |
-| `LAUNDRY` | Laundry allowance | **No** | ₱300 / month | BIR de minimis |
+| `RICE` | Rice subsidy | **No** | ₱2,500 / month per employee | RR 29-2025 |
+| `CLOTHING` | Uniform / clothing allowance | **No** | ₱8,000 / year | RR 29-2025 |
+| `MEDICAL` | Medical / hospitalization reimbursement | **No** | ₱12,000 / year, actual & substantiated | RR 29-2025 |
+| `LAUNDRY` | Laundry allowance | **No** | ₱400 / month | RR 29-2025 |
 | `MEAL` | Meal / daytime allowance | **No** | ₱30 / working day | BIR de minimis |
-| `GIFT` | Gift on major milestone | **No** | ≤ 3 occasions / year, ≤ ₱3,000 each | BIR de minimis |
-| `ACHIEVE` | Achievement award (tangible, non-cash) | **No** | ₱10,000 / year | BIR de minimis |
-| `RD_SUB` | Representation allowance | **No** | ₱1,000 / month | BIR de minimis |
+| `GIFT` | Gift on major milestone | **No** | ₱6,000 / year | RR 29-2025 |
+| `ACHIEVE` | Achievement award (tangible, non-cash) | **No** | ₱12,000 / year | RR 29-2025 |
+| `RD_SUB` | Representation allowance | **Yes** | none — not a de minimis category | Taxable compensation |
 | `PERF_BONUS` | Performance / productivity bonus | **Yes** | none | Taxable compensation |
 | `COLA` | Cost-of-living allowance | **Yes** | — | Taxable unless separately exempted |
 | `OT_PAY` `NSD` `HOL_PAY` | Statutory premiums | **Yes** | — | Taxable compensation |

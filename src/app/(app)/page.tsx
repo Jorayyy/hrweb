@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { count, desc, eq, gte, sum } from "drizzle-orm";
 import { db } from "@/db";
-import { campaign, employee, jobPosition } from "@/db/schema";
+import { campaign, employee, jobPosition, users } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { formatDate, formatPhp } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
@@ -23,6 +23,81 @@ function isoDaysAgo(days: number): string {
 
 export default async function Dashboard() {
   const user = await requireRole();
+
+  if (user.role === "EMPLOYEE") {
+    const [acct] = await db
+      .select({ employeeId: users.employeeId })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
+    const [me] = acct?.employeeId
+      ? await db
+          .select({
+            id: employee.id,
+            employeeNo: employee.employeeNo,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            dateHired: employee.dateHired,
+            status: employee.status,
+            positionTitle: jobPosition.title,
+          })
+          .from(employee)
+          .leftJoin(jobPosition, eq(employee.positionId, jobPosition.id))
+          .where(eq(employee.id, acct.employeeId))
+          .limit(1)
+      : [];
+
+    return (
+      <>
+        <PageHeader title="Dashboard" description={`Signed in as ${user.role}`} />
+        <PageBody>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {me ? (
+              <>
+                <Card>
+                  <CardContent>
+                    <p className="text-xs font-medium text-muted-foreground">Employee no.</p>
+                    <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                      {me.employeeNo}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {me.lastName}, {me.firstName}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent>
+                    <p className="text-xs font-medium text-muted-foreground">Position</p>
+                    <p className="mt-1 text-2xl font-semibold tracking-tight">
+                      {me.positionTitle ?? "—"}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">Date hired {formatDate(me.dateHired)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent>
+                    <p className="text-xs font-medium text-muted-foreground">Status</p>
+                    <div className="mt-2">
+                      <StatusBadge status={me.status} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    No employee profile linked to this account — see HR.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </PageBody>
+      </>
+    );
+  }
+
   const activeSince = isoDaysAgo(30);
 
   const [byStatus, byCampaign, totals, recentHires] = await Promise.all([

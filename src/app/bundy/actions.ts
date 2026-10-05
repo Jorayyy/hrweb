@@ -4,11 +4,12 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { attendanceDay, employee, holidayCalendar, shiftTemplate } from "@/db/schema";
+import { dateKeyDayOfWeek, resolveAnchorDate } from "@/lib/attendance/anchor";
 import { computeDay, type PunchSet } from "@/lib/attendance/compute";
 import { clientIp, isBundyIpAllowed } from "@/lib/bundy";
 import { field, type FormState } from "@/lib/form";
 import { verifyPassword } from "@/lib/password";
-import { MANILA_OFFSET_MS, manilaDateKey, manilaDayOfWeek } from "@/lib/time";
+import { MANILA_OFFSET_MS, manilaDateKey } from "@/lib/time";
 
 const RULE_VERSION = "att-2026.2";
 const DAY_MS = 86_400_000;
@@ -171,25 +172,54 @@ export async function punch(_prev: FormState, formData: FormData): Promise<FormS
 
   const now = Date.now();
   const nowUtc = new Date(now);
-  const workDate = manilaDateKey(now);
+  const today = manilaDateKey(now);
+  const req = PREREQ[slot];
 
-  const [row] = await db
-    .select()
-    .from(attendanceDay)
-    .where(and(eq(attendanceDay.employeeId, emp.id), eq(attendanceDay.workDate, workDate)))
-    .limit(1);
+  const readRow = async (date: string): Promise<DayRow | undefined> => {
+    const [r] = await db
+      .select()
+      .from(attendanceDay)
+      .where(and(eq(attendanceDay.employeeId, emp.id), eq(attendanceDay.workDate, date)))
+      .limit(1);
+    return r;
+  };
+
+  let workDate = today;
+  let row = await readRow(today);
+
+  const todayCanAccept =
+    !req || (slotTime(row, req) !== null && slotTime(row, slot) === null);
+  if (!todayCanAccept) {
+    const prevDate = manilaDateKey(Date.parse(`${today}T00:00:00Z`) - DAY_MS);
+    const prevRow = await readRow(prevDate);
+    workDate = resolveAnchorDate(
+      req !== null,
+      {
+        date: today,
+        hasPrereq: req ? slotTime(row, req) !== null : true,
+        hasSlot: slotTime(row, slot) !== null,
+      },
+      prevRow
+        ? {
+            date: prevDate,
+            hasPrereq: req ? slotTime(prevRow, req) !== null : true,
+            hasSlot: slotTime(prevRow, slot) !== null,
+          }
+        : null,
+    );
+    if (workDate === prevDate) row = prevRow;
+  }
 
   const existing = slotTime(row, slot);
   if (existing) {
     return { error: `${SLOT_LABEL[slot]} was already recorded at ${manilaStamp(existing.getTime())}.` };
   }
-  const req = PREREQ[slot];
   if (req && !slotTime(row, req)) {
     return { error: `Record your ${SLOT_LABEL[req]} punch first.` };
   }
 
   const computed = computeDay(workDate, shift, punchSet(row, slot, nowUtc));
-  const isRestDay = emp.weeklyRestDays.includes(manilaDayOfWeek(now));
+  const isRestDay = emp.weeklyRestDays.includes(dateKeyDayOfWeek(workDate));
   const aggregates = {
     scheduledSeconds: computed.scheduledSeconds,
     workedSeconds: computed.workedSeconds,

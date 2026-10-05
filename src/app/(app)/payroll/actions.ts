@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   allowanceType,
@@ -248,8 +248,17 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
     .where(and(eq(payrollRun.id, runId), eq(payrollRun.periodId, periodId)))
     .limit(1);
   if (!run) back(periodId, undefined, "Run not found.");
-  if (run.status === "POSTED" || run.status === "VOID")
-    back(periodId, runId, "Posted or voided runs are immutable.");
+  if (
+    run.status !== "OPEN" &&
+    run.status !== "CUT_OFF" &&
+    run.status !== "CALCULATED" &&
+    run.status !== "REVIEW"
+  )
+    back(
+      periodId,
+      runId,
+      `Runs in status ${run.status} cannot be recalculated — void it and create a new run.`,
+    );
 
   const [period] = await db
     .select()
@@ -310,8 +319,7 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
         inArray(employee.payFrequency, payFamily),
       ),
     )
-    .orderBy(employee.lastName, employee.firstName)
-    .limit(5000);
+    .orderBy(employee.lastName, employee.firstName);
   if (emps.length === 0)
     back(periodId, runId, "No active employees on this cutoff's pay frequency.");
 
@@ -389,6 +397,7 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
 
   const items: RunItemComputed[] = [];
   const failedIds: number[] = [];
+  const prevStatus = run.status;
 
   try {
     await db.update(payrollRun).set({ status: "CALCULATING" }).where(eq(payrollRun.id, runId));
@@ -437,15 +446,15 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
       }
     }
 
+    const doneIds = items.map((i) => i.employeeId);
+    const tail = doneIds.slice(Math.floor(doneIds.length / 10) * 10);
+    if (tail.length > 0) await markJobs(runId, tail, "DONE");
+
     for (let i = 0; i < items.length; i += CHUNK) {
       await db
         .insert(payrollRunItem)
         .values(items.slice(i, i + CHUNK).map((item) => ({ runId, ...item, calcEngineVer: ENGINE_VERSION })));
     }
-  } finally {
-    const doneIds = items.map((i) => i.employeeId);
-    const tail = doneIds.slice(Math.floor(doneIds.length / 10) * 10);
-    if (tail.length > 0) await markJobs(runId, tail, "DONE");
 
     const grossTotal = items.reduce((s, i) => s + i.grossPay, 0);
     const deductionTotal = items.reduce((s, i) => s + i.totalDeductions, 0);
@@ -462,6 +471,18 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
         approvedAt: null,
       })
       .where(eq(payrollRun.id, runId));
+  } catch (e) {
+    await db.delete(payrollRunItem).where(eq(payrollRunItem.runId, runId));
+    await db.delete(payrollJob).where(eq(payrollJob.runId, runId));
+    await db
+      .update(payrollRun)
+      .set({ status: prevStatus, headcount: null, grossTotal: null, deductionTotal: null, netTotal: null })
+      .where(eq(payrollRun.id, runId));
+    back(
+      periodId,
+      runId,
+      `Calculation failed and was rolled back to ${prevStatus}: ${String(e instanceof Error ? e.message : e).slice(0, 200)}`,
+    );
   }
 
   back(periodId, runId, failedIds.length > 0 ? `${failedIds.length} employee(s) failed — see job log.` : undefined);
@@ -486,6 +507,12 @@ export async function transitionRun(
     back(periodId, runId, `Cannot ${action} a run in status ${run.status}.`);
 
   if (action === "approve") {
+    const [failed] = await db
+      .select({ n: count() })
+      .from(payrollJob)
+      .where(and(eq(payrollJob.runId, runId), eq(payrollJob.status, "FAILED")));
+    if ((failed?.n ?? 0) > 0)
+      back(periodId, runId, `${failed.n} employee(s) failed to calculate — recalculate before approving.`);
     await db
       .update(payrollRun)
       .set({ status: "APPROVED", approvedBy: user.id, approvedAt: new Date() })

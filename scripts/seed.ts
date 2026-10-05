@@ -26,7 +26,7 @@ const EFFECTIVE = "2026-01-01";
 const BIR_SOURCE = "NIRC §24 as amended by RA 10963 (TRAIN); BIR Rev. Reg. 11-2018";
 
 async function main() {
-  await db.delete(sssSchedule).where(eq(sssSchedule.effectiveFrom, SSS_2026.effectiveFrom));
+  await db.delete(sssSchedule);
   await db.insert(sssSchedule).values({
     effectiveFrom: SSS_2026.effectiveFrom,
     totalRate: SSS_2026.totalRate,

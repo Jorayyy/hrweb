@@ -195,6 +195,9 @@ export default async function PayrollPage({
                     {runs.map((r) => {
                       const selected = run?.id === r.id;
                       const mutable = r.status !== "POSTED" && r.status !== "VOID";
+                      const recalculable = ["OPEN", "CUT_OFF", "CALCULATED", "REVIEW"].includes(
+                        r.status,
+                      );
                       return (
                         <TableRow key={r.id} className={selected ? "bg-muted/50" : undefined}>
                           <TableCell>
@@ -222,7 +225,7 @@ export default async function PayrollPage({
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              {selected && mutable ? (
+                              {selected && recalculable ? (
                                 <CalculateButton
                                   action={calculateRun.bind(null, period.id, r.id)}
                                   runId={r.id}

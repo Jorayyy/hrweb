@@ -117,9 +117,25 @@ describe("calcEmployee", () => {
     expect(item.totalDeductions).toBe(
       item.sssEe + item.sssWispEe + item.phicEe + item.hdmfEe + item.birTax,
     );
-    expect(item.netPay).toBe(Math.max(0, item.grossPay - item.totalDeductions));
+    expect(item.netPay).toBe(item.grossPay - item.totalDeductions);
     expect(item.daysWorked).toBe(2);
     expect(item.daysAbsent).toBe(1);
     expect(item.lateSeconds).toBe(900);
+  });
+
+  it("negative net is preserved and flagged REVIEW, never clamped to zero", () => {
+    const weeklyCfg: StatConfig = { ...cfg, frequency: "WEEKLY" };
+    const weekly = { ...emp, payFrequency: "WEEKLY" as const };
+    const item = calcEmployee(
+      weekly,
+      [day({ status: "ABSENT", workedSeconds: 0, absentSeconds: 28_800 })],
+      weeklyCfg,
+    );
+
+    expect(item.grossPay).toBe(0);
+    expect(item.totalDeductions).toBeGreaterThan(0);
+    expect(item.netPay).toBe(item.grossPay - item.totalDeductions);
+    expect(item.netPay).toBeLessThan(0);
+    expect(item.status).toBe("REVIEW");
   });
 });

@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { bundyIp, campaign, costCenter, department, jobPosition } from "@/db/schema";
+import { requireRole } from "@/lib/auth";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { ReferenceForm } from "@/components/reference-form";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ function Section({
 }
 
 export default async function SetupPage() {
+  await requireRole("ADMIN", "HR");
   const [costCenters, campaigns, departments, positions, bundyIps] = await Promise.all([
     db.select().from(costCenter).orderBy(costCenter.code),
     db.select().from(campaign).orderBy(campaign.code),

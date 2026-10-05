@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { bundyIp, campaign, costCenter, department, jobPosition } from "@/db/schema";
+import { announcement, bundyIp, campaign, costCenter, department, jobPosition } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { field, intOrNull, type FormState } from "@/lib/form";
 
@@ -138,4 +138,34 @@ export async function removeBundyIp(id: number): Promise<void> {
   await requireRole("ADMIN", "HR");
   await db.delete(bundyIp).where(eq(bundyIp.id, id));
   revalidatePath("/setup");
+}
+
+export async function addAnnouncement(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireRole("ADMIN", "HR");
+
+  const title = field(formData, "title");
+  const body = field(formData, "body");
+  const errors: Record<string, string> = {};
+  if (!title) errors.title = "Title is required.";
+  if (title.length > 120) errors.title = "Keep the title under 120 characters.";
+  if (!body) errors.body = "Message is required.";
+  if (Object.keys(errors).length > 0) return { errors };
+
+  await db.insert(announcement).values({
+    title,
+    body,
+    pinned: formData.get("pinned") === "on",
+    authorId: user.id,
+  });
+
+  revalidatePath("/setup");
+  revalidatePath("/");
+  return null;
+}
+
+export async function removeAnnouncement(id: number): Promise<void> {
+  await requireRole("ADMIN", "HR");
+  await db.delete(announcement).where(eq(announcement.id, id));
+  revalidatePath("/setup");
+  revalidatePath("/");
 }

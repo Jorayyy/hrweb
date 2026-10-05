@@ -2,7 +2,7 @@ import Link from "next/link";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
-import { attendanceDay } from "@/db/schema";
+import { attendanceDay, holidayCalendar, payrollPeriod } from "@/db/schema";
 import { selfEmployee } from "@/lib/auth";
 import { MANILA_OFFSET_MS, manilaDateKey } from "@/lib/time";
 import { PageBody, PageHeader } from "@/components/page-header";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import DtrCalendar, { type DtrDay } from "./dtr-calendar";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -26,6 +27,10 @@ function hours(seconds: number): string {
 function monthKey(offset: number): string {
   const now = manilaDateKey(Date.now());
   return shiftMonth(now.slice(0, 7), offset);
+}
+
+function nowKey(): string {
+  return manilaDateKey(Date.now());
 }
 
 function shiftMonth(m: string, offset: number): string {
@@ -44,13 +49,14 @@ function monthLabel(m: string): string {
 export default async function DtrPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ m?: string }>;
+  searchParams?: Promise<{ m?: string; view?: string }>;
 }) {
   const { user, employeeId } = await selfEmployee();
   const params = (await searchParams) ?? {};
   const m = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.m ?? "")
     ? (params.m as string)
     : monthKey(0);
+  const view = params.view === "cal" ? "cal" : "tbl";
 
   if (!employeeId) {
     return (
@@ -100,6 +106,48 @@ export default async function DtrPage({
     { sched: 0, worked: 0, ot: 0, late: 0 },
   );
 
+  let calDays: DtrDay[] = [];
+  if (view === "cal") {
+    const [holidayRows, payRows] = await Promise.all([
+      db
+        .select()
+        .from(holidayCalendar)
+        .where(and(gte(holidayCalendar.holidayDate, firstDay), lte(holidayCalendar.holidayDate, lastDay))),
+      db
+        .select({ payDate: payrollPeriod.payDate, periodCode: payrollPeriod.periodCode })
+        .from(payrollPeriod)
+        .where(and(gte(payrollPeriod.payDate, firstDay), lte(payrollPeriod.payDate, lastDay))),
+    ]);
+    const holidayMap = new Map(holidayRows.map((h) => [h.holidayDate, h]));
+    const payMap = new Map(payRows.map((p) => [p.payDate, p.periodCode]));
+    const todayKey = nowKey();
+
+    calDays = days.map(({ key, dow, row }) => {
+      const cal = holidayMap.get(key);
+      const rowHoliday = row && row.holidayKind !== "NONE";
+      return {
+        key,
+        dow,
+        dayNum: Number(key.slice(8)),
+        status: row?.status ?? null,
+        in: fmtHM(row?.punchInUtc ?? null),
+        out: fmtHM(row?.punchOutUtc ?? null),
+        worked: row ? (row.workedSeconds / 3600).toFixed(1) : "—",
+        sched: row ? (row.scheduledSeconds / 3600).toFixed(1) : "—",
+        late: row && row.lateSeconds > 0 ? `${Math.round(row.lateSeconds / 60)}m` : "—",
+        ot: row && row.otWorkedSeconds > 0 ? (row.otWorkedSeconds / 3600).toFixed(1) : "—",
+        restDay: row?.isRestDay ?? false,
+        holiday: rowHoliday ? humanize(row.holidayKind) : (cal?.name ?? null),
+        holidayKind: rowHoliday ? row.holidayKind : (cal?.kind ?? null),
+        payCode: payMap.get(key) ?? null,
+        needsReview: row?.needsReview ?? false,
+        future: key > todayKey,
+      };
+    });
+  }
+
+  const viewParam = view === "cal" ? "&view=cal" : "";
+
   return (
     <>
       <PageHeader
@@ -108,12 +156,18 @@ export default async function DtrPage({
       >
         <div className="flex items-center gap-1">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/dtr?m=${shiftMonth(m, -1)}`} aria-label="Previous month">
+            <Link href={`/dtr?m=${shiftMonth(m, -1)}${viewParam}`} aria-label="Previous month">
               <ChevronLeft className="size-4" />
             </Link>
           </Button>
+          <Button asChild variant={view === "tbl" ? "default" : "outline"} size="sm">
+            <Link href={`/dtr?m=${m}`}>Table</Link>
+          </Button>
+          <Button asChild variant={view === "cal" ? "default" : "outline"} size="sm">
+            <Link href={`/dtr?m=${m}&view=cal`}>Calendar</Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/dtr?m=${shiftMonth(m, 1)}`} aria-label="Next month">
+            <Link href={`/dtr?m=${shiftMonth(m, 1)}${viewParam}`} aria-label="Next month">
               <ChevronRight className="size-4" />
             </Link>
           </Button>
@@ -126,6 +180,10 @@ export default async function DtrPage({
             <CardTitle>Daily time record</CardTitle>
           </CardHeader>
           <CardContent>
+            {view === "cal" ? (
+              <DtrCalendar days={calDays} todayKey={nowKey()} />
+            ) : (
+              <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -196,6 +254,8 @@ export default async function DtrPage({
               Days with no record show “—”. Missing days are not finalized until attendance is
               processed by HR — corrections go through HR.
             </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </PageBody>

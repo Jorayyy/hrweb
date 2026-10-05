@@ -66,7 +66,7 @@ export function PayslipView({
 
         <Card>
           <CardHeader>
-            <CardTitle>Statutory numbers</CardTitle>
+            <CardTitle className="text-violet-600 dark:text-violet-400">Statutory numbers</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">
             <div className="grid grid-cols-2 gap-y-2">
@@ -84,7 +84,7 @@ export function PayslipView({
 
         <Card>
           <CardHeader>
-            <CardTitle>Earnings</CardTitle>
+            <CardTitle className="text-emerald-600 dark:text-emerald-400">Earnings</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -117,7 +117,7 @@ export function PayslipView({
 
         <Card>
           <CardHeader>
-            <CardTitle>Deductions</CardTitle>
+            <CardTitle className="text-rose-600 dark:text-rose-400">Deductions</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -147,14 +147,16 @@ export function PayslipView({
         </Card>
       </div>
 
-      <div className="mt-4 flex flex-col items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-4 sm:flex-row">
+      <div className="mt-4 flex flex-col items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-4 sm:flex-row">
         <span className="text-sm font-medium">Net pay</span>
-        <span className="text-2xl font-semibold tabular-nums">{formatPhp(item.netPay)}</span>
+        <span className="text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+          {formatPhp(item.netPay)}
+        </span>
       </div>
 
       <Card className="mt-4">
         <CardHeader>
-          <CardTitle>Employer contributions</CardTitle>
+          <CardTitle className="text-blue-600 dark:text-blue-400">Employer contributions</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>

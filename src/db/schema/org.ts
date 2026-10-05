@@ -185,6 +185,23 @@ export const employee = pgTable(
   ],
 );
 
+/** Company-wide announcements shown on every employee's dashboard. */
+export const announcement = pgTable(
+  "announcement",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    pinned: boolean("pinned").notNull().default(false),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (t) => [index("ix_announcement_published").on(t.publishedAt)],
+);
+
 /**
  * Append-only compensation ledger: one row per (employee, effective date).
  * Current compensation = latest row with effective_from <= today; a

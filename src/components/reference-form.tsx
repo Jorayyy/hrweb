@@ -9,7 +9,7 @@ import type { FormState } from "@/lib/form";
 export type ReferenceField = {
   name: string;
   label: string;
-  type?: "text" | "number" | "select" | "checkbox" | "time";
+  type?: "text" | "number" | "select" | "checkbox" | "time" | "textarea";
   required?: boolean;
   defaultChecked?: boolean;
   placeholder?: string;
@@ -74,6 +74,16 @@ export function ReferenceForm({
                   </option>
                 ))}
               </select>
+            ) : field.type === "textarea" ? (
+              <textarea
+                id={field.name}
+                name={field.name}
+                required={field.required}
+                placeholder={field.placeholder}
+                rows={3}
+                className="flex w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30"
+                aria-invalid={Boolean(errors[field.name])}
+              />
             ) : (
               <Input
                 id={field.name}

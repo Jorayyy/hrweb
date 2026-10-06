@@ -20,7 +20,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           type="email"
           required
           autoComplete="email"
-          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-zinc-400"
+          className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur placeholder:text-zinc-500 focus:border-white/30"
         />
       </div>
 
@@ -34,7 +34,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           type="password"
           required
           autoComplete="current-password"
-          className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-zinc-400"
+          className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur placeholder:text-zinc-500 focus:border-white/30"
         />
       </div>
 

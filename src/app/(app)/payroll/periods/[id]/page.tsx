@@ -38,7 +38,7 @@ export default async function PayrollPeriodPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ run?: string; page?: string; error?: string }>;
+  searchParams?: Promise<{ run?: string; page?: string; error?: string; warn?: string }>;
 }) {
   await requireRole("ADMIN", "PAYROLL");
 
@@ -48,6 +48,7 @@ export default async function PayrollPeriodPage({
 
   const sp = (await searchParams) ?? {};
   const error = (sp.error ?? "").trim();
+  const warn = (sp.warn ?? "").trim();
 
   const [period] = await db
     .select()
@@ -120,11 +121,14 @@ export default async function PayrollPeriodPage({
         {error ? (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <span>{error}</span>
-            {error.includes("DTR not approved") ? (
-              <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link href="/dtr-review">Open DTR Review</Link>
-              </Button>
-            ) : null}
+          </div>
+        ) : null}
+        {warn ? (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+            <span>{warn}</span>
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link href="/dtr-review">Open DTR Review</Link>
+            </Button>
           </div>
         ) : null}
 

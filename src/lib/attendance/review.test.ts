@@ -97,6 +97,18 @@ describe("weekReadiness", () => {
     expect(r.ready).toBe(true);
     expect(r.approved).toBe(false);
   });
+
+  it("ignores days that have not elapsed yet when given today", () => {
+    const r = weekReadiness(required, [row(required[0]), row(required[1])], required[1]);
+    expect(r.missing).toEqual([]);
+    expect(r.approved).toBe(true);
+  });
+
+  it("is not approved when nothing in the range has elapsed", () => {
+    const r = weekReadiness(required, [], "2026-09-27");
+    expect(r.missing).toEqual([]);
+    expect(r.approved).toBe(false);
+  });
 });
 
 describe("unreviewedOffenders", () => {
@@ -134,5 +146,10 @@ describe("unreviewedOffenders", () => {
       { employeeId: 1, workDate: "2026-10-04", reviewedAt: new Date() },
     ];
     expect(unreviewedOffenders(hires, period, rows)).toEqual([]);
+  });
+
+  it("ignores days that have not elapsed yet when given today", () => {
+    const rows = reviewed(1, ["2026-09-28", "2026-09-29"]);
+    expect(unreviewedOffenders([empA], period, rows, "2026-09-29")).toEqual([]);
   });
 });

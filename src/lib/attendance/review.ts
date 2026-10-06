@@ -90,18 +90,21 @@ export type WeekReadiness = {
   approved: boolean;
 };
 
-/** Pure readiness check for one employee over a week/period range. */
+/** Pure readiness check for one employee over a week/period range. With `today`, days after it are ignored. */
 export function weekReadiness(
   required: readonly string[],
   rows: readonly { workDate: string; needsReview: boolean; reviewedAt: Date | null }[],
+  today?: string,
 ): WeekReadiness {
   const byDate = new Map(rows.map((r) => [r.workDate, r]));
-  const missing = required.filter((d) => !byDate.has(d));
+  const elapsed = today ? required.filter((d) => d <= today) : required;
+  const missing = elapsed.filter((d) => !byDate.has(d));
   const flagged = rows.filter((r) => r.needsReview).map((r) => r.workDate);
   const approved =
     missing.length === 0 &&
     flagged.length === 0 &&
-    required.every((d) => byDate.get(d)?.reviewedAt != null);
+    elapsed.every((d) => byDate.get(d)?.reviewedAt != null) &&
+    (required.length === 0 || elapsed.length > 0);
   return {
     ready: missing.length === 0 && flagged.length === 0,
     missing,
@@ -118,13 +121,14 @@ export type GateEmployee = {
 };
 
 /**
- * Payroll gate: employees whose period range has any required day that is
- * missing or not yet reviewed. Returns their employee numbers.
+ * Payroll gate: employees whose elapsed period days (up to `today`, if given)
+ * are missing or not yet reviewed. Returns their employee numbers.
  */
 export function unreviewedOffenders(
   emps: readonly GateEmployee[],
   period: { dateFrom: string; dateTo: string },
   rows: readonly { employeeId: number; workDate: string; reviewedAt: Date | null }[],
+  today?: string,
 ): string[] {
   const reviewed = new Set(
     rows.filter((r) => r.reviewedAt != null).map((r) => `${r.employeeId}|${r.workDate}`),
@@ -136,7 +140,7 @@ export function unreviewedOffenders(
       to: period.dateTo,
       dateHired: e.dateHired,
       weeklyRestDays: e.weeklyRestDays,
-    });
+    }).filter((d) => !today || d <= today);
     if (required.some((d) => !reviewed.has(`${e.id}|${d}`))) offenders.push(e.employeeNo);
   }
   return offenders;

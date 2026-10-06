@@ -47,10 +47,11 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-function back(periodId: number, runId?: number, error?: string): never {
+function back(periodId: number, runId?: number, error?: string, warn?: string): never {
   const qs = new URLSearchParams();
   if (runId) qs.set("run", String(runId));
   if (error) qs.set("error", error);
+  if (warn) qs.set("warn", warn);
   const suffix = qs.toString();
   redirect(`/payroll/periods/${periodId}${suffix ? `?${suffix}` : ""}`);
 }
@@ -113,7 +114,7 @@ async function lastDtrGateError(frequency: "WEEKLY" | "SEMI_MONTHLY"): Promise<s
         lte(attendanceDay.workDate, last.dateTo),
       ),
     );
-  const offenders = unreviewedOffenders(emps, last, dayRows);
+  const offenders = unreviewedOffenders(emps, last, dayRows, today);
   if (offenders.length === 0) return null;
   return (
     `DTR not approved for ${offenders.length} employee${offenders.length === 1 ? "" : "s"}` +
@@ -130,7 +131,6 @@ export async function openPeriod(formData: FormData): Promise<never> {
     redirect("/payroll?error=Choose a cutoff frequency.");
   }
   const gateError = await lastDtrGateError(frequency);
-  if (gateError) redirect(`/payroll?error=${encodeURIComponent(gateError)}`);
 
   if (frequency === "WEEKLY") {
     const now = Date.now();
@@ -149,7 +149,7 @@ export async function openPeriod(formData: FormData): Promise<never> {
       payDate: new Date(sundayUtc + 7 * DAY_MS).toISOString().slice(0, 10),
       frequency: "WEEKLY",
     });
-    back(id);
+    back(id, undefined, undefined, gateError ?? undefined);
   }
 
   const [y, m, d] = todayParts();
@@ -184,7 +184,7 @@ export async function openPeriod(formData: FormData): Promise<never> {
     payDate,
     frequency: "SEMI_MONTHLY",
   });
-  back(id);
+  back(id, undefined, undefined, gateError ?? undefined);
 }
 
 function todayParts(): [number, number, number] {
@@ -238,10 +238,10 @@ export async function createPeriod(formData: FormData): Promise<never> {
     .where(eq(payrollPeriod.frequency, frequency))
     .orderBy(desc(payrollPeriod.dateTo))
     .limit(1);
-  if (!latest || dateFrom >= latest.dateTo) {
-    const gateError = await lastDtrGateError(frequency === "WEEKLY" ? "WEEKLY" : "SEMI_MONTHLY");
-    if (gateError) fail(gateError);
-  }
+  const gateError =
+    !latest || dateFrom >= latest.dateTo
+      ? await lastDtrGateError(frequency === "WEEKLY" ? "WEEKLY" : "SEMI_MONTHLY")
+      : null;
 
   const [y, m, d] = dateTo.split("-").map(Number);
   const id = await upsertPeriod({
@@ -252,7 +252,7 @@ export async function createPeriod(formData: FormData): Promise<never> {
     payDate,
     frequency,
   });
-  back(id);
+  back(id, undefined, undefined, gateError ?? undefined);
 }
 
 export async function createRun(periodId: number): Promise<never> {
@@ -435,13 +435,6 @@ export async function calculateRun(periodId: number, runId: number): Promise<voi
       ? (["WEEKLY", "DAILY"] as const)
       : (["SEMI_MONTHLY", "MONTHLY"] as const);
 
-  if (period.dateTo >= manilaDateKey(Date.now()))
-    back(
-      periodId,
-      runId,
-      `This cutoff has not ended yet (ends ${period.dateTo}) — calculate after the period ends.`,
-    );
-
   const emps = await db
     .select({
       id: employee.id,
@@ -491,16 +484,6 @@ export async function calculateRun(periodId: number, runId: number): Promise<voi
         gte(attendanceDay.workDate, period.dateFrom),
         lte(attendanceDay.workDate, period.dateTo),
       ),
-    );
-
-  const offenders = unreviewedOffenders(emps, period, dayRows);
-  if (offenders.length > 0)
-    back(
-      periodId,
-      runId,
-      `DTR not approved for ${offenders.length} employee${offenders.length === 1 ? "" : "s"}` +
-        ` (${offenders.slice(0, 3).join(", ")}${offenders.length > 3 ? ", …" : ""}).` +
-        " Approve the missing weeks in DTR Review before calculating.",
     );
 
   const cfg: StatConfig = {

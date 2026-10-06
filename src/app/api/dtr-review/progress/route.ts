@@ -11,6 +11,7 @@ import {
   weekReadiness,
 } from "@/lib/attendance/review";
 import { isIsoDate } from "@/lib/form";
+import { manilaDateKey } from "@/lib/time";
 
 export async function GET(req: Request) {
   const user = (await auth())?.user;
@@ -63,7 +64,8 @@ export async function GET(req: Request) {
       dateHired: emp.dateHired,
       weeklyRestDays: emp.weeklyRestDays,
     });
-    if (weekReadiness(required, byEmp.get(emp.id) ?? []).approved) approved += 1;
+    if (weekReadiness(required, byEmp.get(emp.id) ?? [], manilaDateKey(Date.now())).approved)
+      approved += 1;
   }
 
   return Response.json({ approved, total });

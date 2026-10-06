@@ -96,11 +96,11 @@ export async function periodReadiness(periodId: number, runId?: number): Promise
     key: "period-ended",
     label: "Cutoff has ended",
     ok: period.dateTo < today,
-    blocking: true,
+    blocking: false,
     detail:
       period.dateTo < today
         ? `Ended ${formatDate(period.dateTo)}.`
-        : `Ends ${formatDate(period.dateTo)} — calculate after the cutoff.`,
+        : `Ends ${formatDate(period.dateTo)} — attendance may still change until then.`,
   });
 
   const payFamily =
@@ -141,16 +141,16 @@ export async function periodReadiness(periodId: number, runId?: number): Promise
             ),
           )
       : [];
-  const offenders = unreviewedOffenders(emps, period, dayRows);
+  const offenders = unreviewedOffenders(emps, period, dayRows, today);
   checks.push({
     key: "dtr-approved",
     label: "DTR approved for everyone",
     ok: offenders.length === 0,
-    blocking: true,
+    blocking: false,
     detail:
       offenders.length === 0
         ? `${emps.length} employee(s) on ${period.frequency.toLowerCase()} pay.`
-        : `Missing or unreviewed days for ${offenders.length} employee(s): ${offenders
+        : `${emps.length - offenders.length}/${emps.length} employee(s) approved · missing or unreviewed for ${offenders.length}: ${offenders
             .slice(0, 3)
             .join(", ")}${offenders.length > 3 ? ", …" : ""}.`,
     fix: offenders.length > 0 ? { href: "/dtr-review", text: "Open DTR Review" } : undefined,

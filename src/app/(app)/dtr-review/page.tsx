@@ -131,7 +131,7 @@ export default async function DtrReviewPage({
       dateHired: emp.dateHired,
       weeklyRestDays: emp.weeklyRestDays,
     });
-    const readiness = weekReadiness(required, empRows);
+    const readiness = weekReadiness(required, empRows, todayKey);
     const totals = empRows.reduce(
       (acc, r) => ({
         worked: acc.worked + r.workedSeconds,
@@ -140,15 +140,28 @@ export default async function DtrReviewPage({
       }),
       { worked: 0, late: 0, ot: 0 },
     );
-    return { emp, byDate, required, requiredSet: new Set(required), readiness, totals };
+    return {
+      emp,
+      byDate,
+      required,
+      requiredSet: new Set(required),
+      readiness,
+      totals,
+      absentN: readiness.missing.filter((d) => d < todayKey).length,
+    };
   });
 
   const approvedCount = tableRows.filter((t) => t.readiness.approved).length;
   const approvableIds = tableRows
-    .filter((t) => t.readiness.flagged.length === 0 && !t.readiness.approved)
+    .filter(
+      (t) =>
+        t.readiness.flagged.length === 0 &&
+        !t.readiness.approved &&
+        t.required.some((d) => d <= todayKey),
+    )
     .map((t) => t.emp.id);
   const approvableCount = approvableIds.length;
-  const actionsEnabled = weekOver && approvableCount > 0;
+  const actionsEnabled = approvableCount > 0;
 
   const pages = Math.max(1, Math.ceil(tableRows.length / PAGE_SIZE));
   const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
@@ -205,12 +218,6 @@ export default async function DtrReviewPage({
           </div>
         ) : null}
 
-        {!weekOver ? (
-          <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-            This week has not ended yet — approval opens after {formatDate(to)}.
-          </div>
-        ) : null}
-
         <DtrFilters campaigns={campaigns} departments={departments} />
 
         <Card>
@@ -236,7 +243,7 @@ export default async function DtrReviewPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pageRows.map(({ emp, byDate, requiredSet, readiness, totals }) => (
+                  {pageRows.map(({ emp, byDate, required, requiredSet, readiness, totals, absentN }) => (
                     <TableRow key={emp.id}>
                       <TableCell>
                         <Link href={`/employees/${emp.id}`} className="hover:underline">
@@ -368,11 +375,12 @@ export default async function DtrReviewPage({
                             <input type="hidden" name="f" value={filterQS} />
                             <SubmitButton
                               size="sm"
-                              disabled={!weekOver || readiness.flagged.length > 0}
+                              disabled={
+                                readiness.flagged.length > 0 ||
+                                !required.some((d) => d <= todayKey)
+                              }
                             >
-                              {readiness.missing.length > 0
-                                ? `Approve (${readiness.missing.length} absent)`
-                                : "Approve"}
+                              {absentN > 0 ? `Approve (${absentN} absent)` : "Approve"}
                             </SubmitButton>
                           </form>
                         )}

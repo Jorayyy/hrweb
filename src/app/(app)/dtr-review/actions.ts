@@ -57,8 +57,8 @@ export async function approveWeek(formData: FormData): Promise<never> {
   const f = field(formData, "f");
   if (!w) back(manilaDateKey(Date.now()), "Invalid week.", undefined, f);
   const to = addDays(w, 6);
-  if (!(manilaDateKey(Date.now()) > to))
-    back(w, "This week has not ended yet.", undefined, f);
+  const today = manilaDateKey(Date.now());
+  if (w > today) back(w, "This week has not started yet.", undefined, f);
 
   const empId = Number(field(formData, "employeeId")) || 0;
   const hasIds = formData.has("ids");
@@ -86,6 +86,7 @@ export async function approveWeek(formData: FormData): Promise<never> {
     const r = weekReadiness(
       requiredDates({ from: w, to, dateHired: emp.dateHired, weeklyRestDays: emp.weeklyRestDays }),
       rows,
+      today,
     );
     if (r.flagged.length > 0)
       back(
@@ -94,7 +95,8 @@ export async function approveWeek(formData: FormData): Promise<never> {
         undefined,
         f,
       );
-    const absentErr = await markAbsentDays(empId, r.missing);
+    const toMark = r.missing.filter((d) => d < today);
+    const absentErr = await markAbsentDays(empId, toMark);
     if (absentErr) back(w, absentErr, undefined, f);
 
     await db
@@ -111,8 +113,8 @@ export async function approveWeek(formData: FormData): Promise<never> {
       w,
       undefined,
       `Approved week for ${emp.employeeNo}.` +
-        (r.missing.length > 0
-          ? ` ${r.missing.length} missing day${r.missing.length === 1 ? "" : "s"} marked absent.`
+        (toMark.length > 0
+          ? ` ${toMark.length} missing day${toMark.length === 1 ? "" : "s"} marked absent.`
           : ""),
       f,
     );
@@ -144,16 +146,18 @@ export async function approveWeek(formData: FormData): Promise<never> {
     const r = weekReadiness(
       requiredDates({ from: w, to, dateHired: emp.dateHired, weeklyRestDays: emp.weeklyRestDays }),
       byEmp.get(emp.id) ?? [],
+      today,
     );
     if (r.approved) continue;
     if (r.flagged.length > 0) {
       flaggedSkipped++;
       continue;
     }
-    if (r.missing.length > 0) {
-      const err = await markAbsentDays(emp.id, r.missing);
+    const toMark = r.missing.filter((d) => d < today);
+    if (toMark.length > 0) {
+      const err = await markAbsentDays(emp.id, toMark);
       if (err) back(w, `${emp.employeeNo}: ${err}`, undefined, f);
-      absentDays += r.missing.length;
+      absentDays += toMark.length;
     }
     await db
       .update(attendanceDay)

@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, selectCx } from "@/components/ui/field";
@@ -62,9 +63,9 @@ export default async function PayrollPage({
             <option value="SEMI_MONTHLY">Semi-monthly</option>
             <option value="WEEKLY">Weekly</option>
           </select>
-          <Button type="submit" size="sm">
+          <SubmitButton size="sm">
             Open cutoff
-          </Button>
+          </SubmitButton>
         </form>
       </PageHeader>
 
@@ -139,9 +140,9 @@ export default async function PayrollPage({
                                 {stat?.n ?? 0}
                               </span>
                               <form action={createRun.bind(null, p.id)} className="inline">
-                                <Button type="submit" variant="outline" size="sm">
+                                <SubmitButton variant="outline" size="sm">
                                   New run
-                                </Button>
+                                </SubmitButton>
                               </form>
                               <Button asChild variant="ghost" size="sm">
                                 <Link href={`/payroll/periods/${p.id}`}>
@@ -189,9 +190,9 @@ export default async function PayrollPage({
                     </select>
                   </Field>
                   <div className="flex items-end">
-                    <Button type="submit" size="sm" className="w-full">
+                    <SubmitButton size="sm" className="w-full">
                       Create period
-                    </Button>
+                    </SubmitButton>
                   </div>
                 </form>
               </details>

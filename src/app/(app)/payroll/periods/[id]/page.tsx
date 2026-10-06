@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth";
 import { formatDate, formatPhp } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
+import { SubmitButton } from "@/components/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -233,36 +234,34 @@ export default async function PayrollPeriodPage({
                                 <form
                                   action={transitionRun.bind(null, id, r.id, "approve")}
                                 >
-                                  <Button
-                                    type="submit"
+                                  <SubmitButton
                                     variant="outline"
                                     size="sm"
                                     disabled={!ready}
                                     title={ready ? undefined : "Blocking checks are failing"}
                                   >
                                     Approve
-                                  </Button>
+                                  </SubmitButton>
                                 </form>
                               ) : null}
                               {selected && r.status === "APPROVED" ? (
                                 <form action={transitionRun.bind(null, id, r.id, "post")}>
-                                  <Button
-                                    type="submit"
+                                  <SubmitButton
                                     size="sm"
                                     disabled={!ready}
                                     title={ready ? undefined : "Blocking checks are failing"}
                                   >
                                     Post
-                                  </Button>
+                                  </SubmitButton>
                                 </form>
                               ) : null}
                               {selected && mutable ? (
                                 <form
                                   action={transitionRun.bind(null, id, r.id, "void")}
                                 >
-                                  <Button type="submit" variant="ghost" size="sm">
+                                  <SubmitButton variant="ghost" size="sm">
                                     Void
-                                  </Button>
+                                  </SubmitButton>
                                 </form>
                               ) : null}
                             </div>
@@ -278,9 +277,9 @@ export default async function PayrollPeriodPage({
                     {runs.length} run{runs.length === 1 ? "" : "s"} on this cutoff
                   </span>
                   <form action={createRun.bind(null, id)} className="inline">
-                    <Button type="submit" variant="outline" size="sm">
+                    <SubmitButton variant="outline" size="sm">
                       New run
-                    </Button>
+                    </SubmitButton>
                   </form>
                 </div>
               </CardContent>

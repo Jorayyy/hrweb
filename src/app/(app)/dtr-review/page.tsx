@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/money";
 import { isoWeek, manilaDateKey } from "@/lib/time";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { humanize } from "@/components/status-badge";
+import { SubmitButton } from "@/components/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -155,9 +156,9 @@ export default async function DtrReviewPage({
           </Button>
           <form action={approveWeek}>
             <input type="hidden" name="w" value={w} />
-            <Button type="submit" size="sm" disabled={!actionsEnabled}>
+            <SubmitButton size="sm" disabled={!actionsEnabled}>
               Approve all ({approvableCount})
-            </Button>
+            </SubmitButton>
           </form>
         </div>
       </PageHeader>
@@ -323,23 +324,22 @@ export default async function DtrReviewPage({
                           <form action={reopenWeek}>
                             <input type="hidden" name="w" value={w} />
                             <input type="hidden" name="employeeId" value={emp.id} />
-                            <Button type="submit" variant="outline" size="sm">
+                            <SubmitButton variant="outline" size="sm">
                               Reopen
-                            </Button>
+                            </SubmitButton>
                           </form>
                         ) : (
                           <form action={approveWeek}>
                             <input type="hidden" name="w" value={w} />
                             <input type="hidden" name="employeeId" value={emp.id} />
-                            <Button
-                              type="submit"
+                            <SubmitButton
                               size="sm"
                               disabled={!weekOver || readiness.flagged.length > 0}
                             >
                               {readiness.missing.length > 0
                                 ? `Approve (${readiness.missing.length} absent)`
                                 : "Approve"}
-                            </Button>
+                            </SubmitButton>
                           </form>
                         )}
                       </TableCell>

@@ -22,7 +22,7 @@ export function CalculateButton({
       size="sm"
       disabled={pending}
       onClick={() => {
-        registerJob({ runId });
+        registerJob({ kind: "calc", runId });
         startTransition(async () => {
           await action();
           router.refresh();

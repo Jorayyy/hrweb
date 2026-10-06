@@ -3,13 +3,16 @@
 import * as React from "react";
 import { Loader2Icon } from "lucide-react";
 import { useFormStatus } from "react-dom";
+import { registerJob, type Job } from "@/components/job-progress";
 import { Button } from "@/components/ui/button";
 
 export function SubmitButton({
   children,
   disabled,
+  job,
+  onClick,
   ...props
-}: React.ComponentProps<typeof Button>) {
+}: React.ComponentProps<typeof Button> & { job?: Job }) {
   const { pending } = useFormStatus();
   const [slow, setSlow] = React.useState(false);
 
@@ -23,7 +26,15 @@ export function SubmitButton({
   }, [pending]);
 
   return (
-    <Button {...props} type="submit" disabled={pending || disabled}>
+    <Button
+      {...props}
+      type="submit"
+      disabled={pending || disabled}
+      onClick={(e) => {
+        if (job) registerJob(job);
+        onClick?.(e);
+      }}
+    >
       {pending && slow ? <Loader2Icon className="animate-spin" /> : null}
       {children}
     </Button>

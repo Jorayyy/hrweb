@@ -5,28 +5,19 @@ import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { attendanceDay, employee } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
-import { addDays, mondayOf, requiredDates, weekReadiness } from "@/lib/attendance/review";
+import { addDays, mondayOf, parseDtrFilter, requiredDates, weekReadiness } from "@/lib/attendance/review";
 import { field, isIsoDate } from "@/lib/form";
 import { manilaDateKey } from "@/lib/time";
 import { saveAttendanceDay } from "../attendance/actions";
-
-function filterParams(f: string): URLSearchParams {
-  const src = new URLSearchParams(f);
-  const out = new URLSearchParams();
-  const campaign = src.get("campaign") ?? "";
-  const dept = src.get("dept") ?? "";
-  const q = (src.get("q") ?? "").slice(0, 50);
-  if (/^\d+$/.test(campaign)) out.set("campaign", campaign);
-  if (/^\d+$/.test(dept)) out.set("dept", dept);
-  if (q) out.set("q", q);
-  return out;
-}
 
 function back(w: string, error?: string, ok?: string, f = ""): never {
   const qs = new URLSearchParams({ w });
   if (error) qs.set("error", error);
   if (ok) qs.set("ok", ok);
-  for (const [k, v] of filterParams(f)) qs.set(k, v);
+  const fl = parseDtrFilter(f);
+  if (fl.campaignId) qs.set("campaign", String(fl.campaignId));
+  if (fl.deptId) qs.set("dept", String(fl.deptId));
+  if (fl.q) qs.set("q", fl.q);
   redirect(`/dtr-review?${qs.toString()}`);
 }
 
@@ -164,20 +155,17 @@ export async function approveWeek(formData: FormData): Promise<never> {
       if (err) back(w, `${emp.employeeNo}: ${err}`, undefined, f);
       absentDays += r.missing.length;
     }
-    ready.push(emp.id);
-  }
-
-  if (ready.length > 0) {
     await db
       .update(attendanceDay)
       .set({ reviewedBy: user.id, reviewedAt: now })
       .where(
         and(
-          inArray(attendanceDay.employeeId, ready),
+          eq(attendanceDay.employeeId, emp.id),
           gte(attendanceDay.workDate, w),
           lte(attendanceDay.workDate, to),
         ),
       );
+    ready.push(emp.id);
   }
 
   back(

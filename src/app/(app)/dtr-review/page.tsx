@@ -6,6 +6,8 @@ import { requireRole } from "@/lib/auth";
 import {
   addDays,
   dateRange,
+  encodeDtrFilter,
+  matchFilteredEmployee,
   mondayOf,
   requiredDates,
   weekReadiness,
@@ -79,14 +81,9 @@ export default async function DtrReviewPage({
 
   const campaignId = /^\d+$/.test(params.campaign ?? "") ? Number(params.campaign) : 0;
   const deptId = /^\d+$/.test(params.dept ?? "") ? Number(params.dept) : 0;
-  const q = (params.q ?? "").trim().slice(0, 50);
-  const filterQS = (() => {
-    const p = new URLSearchParams();
-    if (campaignId) p.set("campaign", String(campaignId));
-    if (deptId) p.set("dept", String(deptId));
-    if (q) p.set("q", q);
-    return p.toString();
-  })();
+  const q = (params.q ?? "").trim().toLowerCase().slice(0, 50);
+  const filter = { campaignId, deptId, q };
+  const filterQS = encodeDtrFilter(filter);
 
   const [emps, rows, holidayRows, campaigns, departments] = await Promise.all([
     db
@@ -115,12 +112,7 @@ export default async function DtrReviewPage({
     db.select({ id: department.id, name: department.name }).from(department).orderBy(department.name),
   ]);
 
-  const shown = emps.filter(
-    (e) =>
-      (!campaignId || e.campaignId === campaignId) &&
-      (!deptId || e.departmentId === deptId) &&
-      (!q || `${e.firstName} ${e.lastName} ${e.employeeNo}`.toLowerCase().includes(q)),
-  );
+  const shown = emps.filter((e) => matchFilteredEmployee(filter, e));
 
   const byEmp = new Map<number, typeof rows>();
   for (const row of rows) {
@@ -184,7 +176,17 @@ export default async function DtrReviewPage({
             <input type="hidden" name="w" value={w} />
             <input type="hidden" name="ids" value={approvableIds.join(",")} />
             <input type="hidden" name="f" value={filterQS} />
-            <SubmitButton size="sm" disabled={!actionsEnabled}>
+            <SubmitButton
+              size="sm"
+              disabled={!actionsEnabled}
+              job={{
+                kind: "dtr",
+                w,
+                f: filterQS,
+                from: approvedCount,
+                to: approvedCount + approvableCount,
+              }}
+            >
               Approve all ({approvableCount})
             </SubmitButton>
           </form>

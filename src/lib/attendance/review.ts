@@ -44,6 +44,45 @@ export function requiredDates(opts: {
   );
 }
 
+export type DtrFilter = { campaignId: number; deptId: number; q: string };
+
+/** Whitelists campaign/dept/q from a raw query string (e.g. a hidden form field). */
+export function parseDtrFilter(f: string): DtrFilter {
+  const src = new URLSearchParams(f);
+  const campaign = src.get("campaign") ?? "";
+  const dept = src.get("dept") ?? "";
+  return {
+    campaignId: /^\d+$/.test(campaign) ? Number(campaign) : 0,
+    deptId: /^\d+$/.test(dept) ? Number(dept) : 0,
+    q: (src.get("q") ?? "").trim().toLowerCase().slice(0, 50),
+  };
+}
+
+export function encodeDtrFilter(fl: DtrFilter): string {
+  const p = new URLSearchParams();
+  if (fl.campaignId) p.set("campaign", String(fl.campaignId));
+  if (fl.deptId) p.set("dept", String(fl.deptId));
+  if (fl.q) p.set("q", fl.q);
+  return p.toString();
+}
+
+export function matchFilteredEmployee(
+  fl: DtrFilter,
+  e: {
+    firstName: string;
+    lastName: string;
+    employeeNo: string;
+    campaignId: number | null;
+    departmentId: number | null;
+  },
+): boolean {
+  if (fl.campaignId && e.campaignId !== fl.campaignId) return false;
+  if (fl.deptId && e.departmentId !== fl.deptId) return false;
+  if (fl.q && !`${e.firstName} ${e.lastName} ${e.employeeNo}`.toLowerCase().includes(fl.q))
+    return false;
+  return true;
+}
+
 export type WeekReadiness = {
   ready: boolean;
   missing: string[];

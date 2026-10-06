@@ -71,13 +71,8 @@ export default async function PayrollPage({
 
       <PageBody>
         {error ? (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            <span>{error}</span>
-            {error.includes("DTR not approved") ? (
-              <Button asChild variant="outline" size="sm" className="shrink-0">
-                <Link href="/dtr-review">Open DTR Review</Link>
-              </Button>
-            ) : null}
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
           </div>
         ) : null}
 

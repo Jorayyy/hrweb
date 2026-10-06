@@ -10,10 +10,13 @@ import {
   employee,
   employeeAllowance,
   hdmfSchedule,
+  payrollAdjustment,
   payrollJob,
+  payrollLine,
   payrollPeriod,
   payrollRun,
   payrollRunItem,
+  payslipRevision,
   phicSchedule,
   premiumMatrix,
   sssSchedule,
@@ -358,6 +361,37 @@ export async function createRun(periodId: number): Promise<never> {
     .returning({ id: payrollRun.id });
 
   back(periodId, run.id);
+}
+
+export async function deletePeriod(periodId: number): Promise<void> {
+  await requireRole("ADMIN", "PAYROLL");
+
+  const [period] = await db
+    .select({ id: payrollPeriod.id })
+    .from(payrollPeriod)
+    .where(eq(payrollPeriod.id, periodId))
+    .limit(1);
+  if (!period) redirect("/payroll?error=Cutoff not found.");
+
+  const runIds = (
+    await db.select({ id: payrollRun.id }).from(payrollRun).where(eq(payrollRun.periodId, periodId))
+  ).map((r) => r.id);
+  if (runIds.length > 0) {
+    await db
+      .delete(payrollAdjustment)
+      .where(
+        or(inArray(payrollAdjustment.runId, runIds), eq(payrollAdjustment.effectivePeriodId, periodId)),
+      );
+    await db.delete(payslipRevision).where(inArray(payslipRevision.runId, runIds));
+    await db.delete(payrollLine).where(inArray(payrollLine.runId, runIds));
+    await db.delete(payrollJob).where(inArray(payrollJob.runId, runIds));
+    await db.delete(payrollRunItem).where(inArray(payrollRunItem.runId, runIds));
+    await db.delete(payrollRun).where(eq(payrollRun.periodId, periodId));
+  } else {
+    await db.delete(payrollAdjustment).where(eq(payrollAdjustment.effectivePeriodId, periodId));
+  }
+  await db.delete(payrollPeriod).where(eq(payrollPeriod.id, periodId));
+  redirect("/payroll");
 }
 
 async function markJobs(runId: number, employeeIds: number[], status: "DONE" | "FAILED", error?: string) {

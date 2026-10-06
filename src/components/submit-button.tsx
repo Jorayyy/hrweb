@@ -11,8 +11,9 @@ export function SubmitButton({
   disabled,
   job,
   onClick,
+  confirmText,
   ...props
-}: React.ComponentProps<typeof Button> & { job?: Job }) {
+}: React.ComponentProps<typeof Button> & { job?: Job; confirmText?: string }) {
   const { pending } = useFormStatus();
   const [slow, setSlow] = React.useState(false);
 
@@ -31,6 +32,10 @@ export function SubmitButton({
       type="submit"
       disabled={pending || disabled}
       onClick={(e) => {
+        if (confirmText && !window.confirm(confirmText)) {
+          e.preventDefault();
+          return;
+        }
         if (job) registerJob(job);
         onClick?.(e);
       }}

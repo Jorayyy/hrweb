@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CalculateButton } from "../../calculate-button";
-import { calculateRun, createRun, transitionRun } from "../../actions";
+import { calculateRun, createRun, deletePeriod, transitionRun } from "../../actions";
 import { periodReadiness, type Check } from "../../readiness";
 
 const PAGE_SIZE = 25;
@@ -114,6 +114,15 @@ export default async function PayrollPeriodPage({
           <Button asChild variant="outline" size="sm">
             <Link href="/payroll">All periods</Link>
           </Button>
+          <form action={deletePeriod.bind(null, id)}>
+            <SubmitButton
+              variant="destructive"
+              size="sm"
+              confirmText={`Delete ${period.periodCode} and all of its runs? This cannot be undone.`}
+            >
+              Delete cutoff
+            </SubmitButton>
+          </form>
         </div>
       </PageHeader>
 

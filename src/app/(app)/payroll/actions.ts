@@ -369,7 +369,7 @@ async function markJobs(runId: number, employeeIds: number[], status: "DONE" | "
   }
 }
 
-export async function calculateRun(periodId: number, runId: number): Promise<never> {
+export async function calculateRun(periodId: number, runId: number): Promise<void> {
   await requireRole("ADMIN", "PAYROLL");
 
   const [run] = await db
@@ -635,7 +635,8 @@ export async function calculateRun(periodId: number, runId: number): Promise<nev
     );
   }
 
-  back(periodId, runId, failedIds.length > 0 ? `${failedIds.length} employee(s) failed — see job log.` : undefined);
+  if (failedIds.length > 0)
+    back(periodId, runId, `${failedIds.length} employee(s) failed — see job log.`);
 }
 
 export async function transitionRun(

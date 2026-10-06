@@ -10,8 +10,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, selectCx } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -20,9 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CreatePayroll } from "./create-payroll";
 import { createPeriod, createRun, openPeriod } from "./actions";
-
-const FREQS = ["SEMI_MONTHLY", "MONTHLY", "WEEKLY", "DAILY"] as const;
 
 export default async function PayrollPage({
   searchParams,
@@ -58,15 +55,7 @@ export default async function PayrollPage({
   return (
     <>
       <PageHeader title="Payroll" description="Cutoff periods, runs and registers">
-        <form action={openPeriod} className="flex items-center gap-2">
-          <select name="frequency" defaultValue="SEMI_MONTHLY" className={`${selectCx} h-8 w-40`}>
-            <option value="SEMI_MONTHLY">Semi-monthly</option>
-            <option value="WEEKLY">Weekly</option>
-          </select>
-          <SubmitButton size="sm">
-            Open cutoff
-          </SubmitButton>
-        </form>
+        <CreatePayroll open={openPeriod} custom={createPeriod} />
       </PageHeader>
 
       <PageBody>
@@ -88,7 +77,7 @@ export default async function PayrollPage({
             <CardContent>
               {periods.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  No periods yet — open the next cutoff to begin.
+                  No payrolls yet — create one to begin.
                 </p>
               ) : (
                 <Table>
@@ -153,44 +142,6 @@ export default async function PayrollPage({
                   </TableBody>
                 </Table>
               )}
-
-              <details className="group mt-4 rounded-lg border border-border">
-                <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
-                  <span>Open a custom period</span>
-                  <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
-                </summary>
-                <form
-                  action={createPeriod}
-                  className="grid gap-3 border-t border-border p-4 sm:grid-cols-2 lg:grid-cols-6"
-                >
-                  <Field label="Period code" name="periodCode" className="lg:col-span-1">
-                    <Input id="periodCode" name="periodCode" placeholder="2026-09-C" required />
-                  </Field>
-                  <Field label="Date from" name="dateFrom">
-                    <Input id="dateFrom" name="dateFrom" type="date" required />
-                  </Field>
-                  <Field label="Date to" name="dateTo">
-                    <Input id="dateTo" name="dateTo" type="date" required />
-                  </Field>
-                  <Field label="Pay date" name="payDate">
-                    <Input id="payDate" name="payDate" type="date" required />
-                  </Field>
-                  <Field label="Frequency" name="frequency">
-                    <select id="frequency" name="frequency" defaultValue="SEMI_MONTHLY" className={selectCx}>
-                      {FREQS.map((f) => (
-                        <option key={f} value={f}>
-                          {f.replace("_", " ").toLowerCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <div className="flex items-end">
-                    <SubmitButton size="sm" className="w-full">
-                      Create period
-                    </SubmitButton>
-                  </div>
-                </form>
-              </details>
             </CardContent>
           </Card>
         </div>

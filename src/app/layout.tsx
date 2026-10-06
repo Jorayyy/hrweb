@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { getCompany } from "@/lib/settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,10 +13,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "BPO-HRWeb",
-  description: "HR, timekeeping and payroll for BPO operations",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const company = await getCompany();
+  return {
+    title: company.name,
+    description: "HR, timekeeping and payroll for BPO operations",
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -31,6 +31,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/schedule", label: "Schedule", icon: "calendar", roles: ["ADMIN", "HR"] },
   { href: "/payroll", label: "Payroll", icon: "wallet", roles: ["ADMIN", "PAYROLL"] },
   { href: "/setup", label: "Setup", icon: "settings", roles: ["ADMIN", "HR"] },
+  { href: "/settings", label: "Settings", icon: "settings", roles: ["ADMIN"] },
 ];
 
 export function navForRole(role: UserRole): { href: string; label: string; icon: IconKey }[] {

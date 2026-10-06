@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { authenticate } from "./actions";
 
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [error, formAction, pending] = useActionState(authenticate, null);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form action={formAction} className="mt-6 space-y-4">
@@ -28,14 +30,24 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         <label htmlFor="password" className="block text-xs font-medium uppercase tracking-wide text-zinc-400">
           Password
         </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          className="mt-1 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur placeholder:text-zinc-500 focus:border-white/30"
-        />
+        <div className="relative mt-1">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete="current-password"
+            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 pr-10 text-sm text-white outline-none backdrop-blur placeholder:text-zinc-500 focus:border-white/30"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 hover:text-zinc-200"
+          >
+            {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+          </button>
+        </div>
       </div>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}

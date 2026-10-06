@@ -150,6 +150,12 @@ export const employeeAllowance = pgTable(
   ],
 );
 
+/** App-wide settings (company name, logo, …) as a simple key-value store. */
+export const appSetting = pgTable("app_setting", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 /** IPs authorized to record punches on the web-bundy kiosk. */
 export const bundyIp = pgTable("bundy_ip", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),

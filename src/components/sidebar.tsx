@@ -41,6 +41,7 @@ const ICONS: Record<IconKey, LucideIcon> = {
 type Props = {
   items: { href: string; label: string; icon: IconKey }[];
   user: { name: string | null; email: string | null; role: string };
+  company: { name: string; logo: string | null };
 };
 
 function initials(name: string): string {
@@ -51,17 +52,22 @@ function initials(name: string): string {
     .join("");
 }
 
-export function Sidebar({ items, user }: Props) {
+export function Sidebar({ items, user, company }: Props) {
   const pathname = usePathname();
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-300">
       <div className="flex h-14 items-center gap-2.5 border-b border-zinc-800 px-4">
-        <div className="flex size-7 items-center justify-center rounded-md bg-white text-[11px] font-bold text-zinc-900">
-          HR
-        </div>
+        {company.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={company.logo} alt={company.name} className="size-7 rounded-md object-cover" />
+        ) : (
+          <div className="flex size-7 items-center justify-center rounded-md bg-white text-[11px] font-bold text-zinc-900">
+            HR
+          </div>
+        )}
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold leading-tight text-white">BPO-HRWeb</div>
+          <div className="truncate text-sm font-semibold leading-tight text-white">{company.name}</div>
           <div className="truncate text-[10px] uppercase tracking-wider text-zinc-500">
             People · Time · Pay
           </div>

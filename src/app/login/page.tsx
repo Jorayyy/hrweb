@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCompany } from "@/lib/settings";
 import { LoginForm } from "./form";
 
 export default async function LoginPage({
@@ -7,21 +8,21 @@ export default async function LoginPage({
   searchParams?: Promise<{ callbackUrl?: string }>;
 }) {
   const { callbackUrl } = (await searchParams) ?? {};
+  const company = await getCompany();
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 px-4">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 -top-40 size-[32rem] rounded-full bg-emerald-600/15 blur-3xl" />
-        <div className="absolute -bottom-48 right-[-10rem] size-[36rem] rounded-full bg-sky-600/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(9,9,11,0.55)_100%)]" />
-      </div>
-
-      <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+    <div className="flex min-h-screen items-center justify-center bg-black px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-md bg-white text-xs font-bold text-zinc-900">
-            HR
-          </div>
-          <div className="text-base font-semibold tracking-wide text-white">BPO-HRWeb</div>
+          {company.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={company.logo} alt={company.name} className="size-8 rounded-md object-cover" />
+          ) : (
+            <div className="flex size-8 items-center justify-center rounded-md bg-white text-xs font-bold text-zinc-900">
+              HR
+            </div>
+          )}
+          <div className="text-base font-semibold tracking-wide text-white">{company.name}</div>
         </div>
 
         <p className="mt-1 text-sm text-zinc-400">Sign in to continue</p>

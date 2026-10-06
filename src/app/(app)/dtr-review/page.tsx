@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { attendanceDay, employee, holidayCalendar } from "@/db/schema";
+import { attendanceDay, campaign, department, employee, holidayCalendar } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import {
   addDays,
@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { approveWeek, reopenWeek } from "./actions";
+import { DtrFilters } from "./filters";
 import { WeekPicker } from "./week-picker";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -50,7 +51,15 @@ function hours(seconds: number): string {
 export default async function DtrReviewPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ w?: string; page?: string; error?: string; ok?: string }>;
+  searchParams?: Promise<{
+    w?: string;
+    page?: string;
+    error?: string;
+    ok?: string;
+    campaign?: string;
+    dept?: string;
+    q?: string;
+  }>;
 }) {
   await requireRole("ADMIN", "HR");
 
@@ -68,7 +77,18 @@ export default async function DtrReviewPage({
     return `${year}-W${String(week).padStart(2, "0")}`;
   })();
 
-  const [emps, rows, holidayRows] = await Promise.all([
+  const campaignId = /^\d+$/.test(params.campaign ?? "") ? Number(params.campaign) : 0;
+  const deptId = /^\d+$/.test(params.dept ?? "") ? Number(params.dept) : 0;
+  const q = (params.q ?? "").trim().slice(0, 50);
+  const filterQS = (() => {
+    const p = new URLSearchParams();
+    if (campaignId) p.set("campaign", String(campaignId));
+    if (deptId) p.set("dept", String(deptId));
+    if (q) p.set("q", q);
+    return p.toString();
+  })();
+
+  const [emps, rows, holidayRows, campaigns, departments] = await Promise.all([
     db
       .select({
         id: employee.id,
@@ -77,6 +97,8 @@ export default async function DtrReviewPage({
         lastName: employee.lastName,
         dateHired: employee.dateHired,
         weeklyRestDays: employee.weeklyRestDays,
+        campaignId: employee.campaignId,
+        departmentId: employee.departmentId,
       })
       .from(employee)
       .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]))
@@ -89,7 +111,16 @@ export default async function DtrReviewPage({
       .select()
       .from(holidayCalendar)
       .where(and(gte(holidayCalendar.holidayDate, w), lte(holidayCalendar.holidayDate, to))),
+    db.select({ id: campaign.id, name: campaign.name }).from(campaign).orderBy(campaign.name),
+    db.select({ id: department.id, name: department.name }).from(department).orderBy(department.name),
   ]);
+
+  const shown = emps.filter(
+    (e) =>
+      (!campaignId || e.campaignId === campaignId) &&
+      (!deptId || e.departmentId === deptId) &&
+      (!q || `${e.firstName} ${e.lastName} ${e.employeeNo}`.toLowerCase().includes(q)),
+  );
 
   const byEmp = new Map<number, typeof rows>();
   for (const row of rows) {
@@ -99,7 +130,7 @@ export default async function DtrReviewPage({
   }
   const holidayByDate = new Map(holidayRows.map((h) => [h.holidayDate, h.name]));
 
-  const tableRows = emps.map((emp) => {
+  const tableRows = shown.map((emp) => {
     const empRows = byEmp.get(emp.id) ?? [];
     const byDate = new Map(empRows.map((r) => [r.workDate, r]));
     const required = requiredDates({
@@ -121,22 +152,28 @@ export default async function DtrReviewPage({
   });
 
   const approvedCount = tableRows.filter((t) => t.readiness.approved).length;
-  const approvableCount = tableRows.filter(
-    (t) => t.readiness.flagged.length === 0 && !t.readiness.approved,
-  ).length;
+  const approvableIds = tableRows
+    .filter((t) => t.readiness.flagged.length === 0 && !t.readiness.approved)
+    .map((t) => t.emp.id);
+  const approvableCount = approvableIds.length;
   const actionsEnabled = weekOver && approvableCount > 0;
 
   const pages = Math.max(1, Math.ceil(tableRows.length / PAGE_SIZE));
   const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
   const pageRows = tableRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const pageLink = (target: number) => `/dtr-review?w=${w}&page=${target}`;
+  const pageLink = (target: number) =>
+    `/dtr-review?w=${w}${filterQS ? `&${filterQS}` : ""}&page=${target}`;
   return (
     <>
       <PageHeader
         back
         title="DTR Review"
-        description={`${weekLabel} · ${formatDate(w)} – ${formatDate(to)} · ${tableRows.length} employees · ${approvedCount} approved`}
+        description={`${weekLabel} · ${formatDate(w)} – ${formatDate(to)} · ${
+          filterQS
+            ? `${tableRows.length} of ${emps.length} employees`
+            : `${tableRows.length} employees`
+        } · ${approvedCount} approved`}
       >
         <div className="flex items-center gap-1">
           <Button asChild variant="outline" size="sm">
@@ -145,6 +182,8 @@ export default async function DtrReviewPage({
           <WeekPicker w={w} today={todayKey} />
           <form action={approveWeek}>
             <input type="hidden" name="w" value={w} />
+            <input type="hidden" name="ids" value={approvableIds.join(",")} />
+            <input type="hidden" name="f" value={filterQS} />
             <SubmitButton size="sm" disabled={!actionsEnabled}>
               Approve all ({approvableCount})
             </SubmitButton>
@@ -169,6 +208,8 @@ export default async function DtrReviewPage({
             This week has not ended yet — approval opens after {formatDate(to)}.
           </div>
         ) : null}
+
+        <DtrFilters campaigns={campaigns} departments={departments} />
 
         <Card>
           <CardHeader>
@@ -313,6 +354,7 @@ export default async function DtrReviewPage({
                           <form action={reopenWeek}>
                             <input type="hidden" name="w" value={w} />
                             <input type="hidden" name="employeeId" value={emp.id} />
+                            <input type="hidden" name="f" value={filterQS} />
                             <SubmitButton variant="outline" size="sm">
                               Reopen
                             </SubmitButton>
@@ -321,6 +363,7 @@ export default async function DtrReviewPage({
                           <form action={approveWeek}>
                             <input type="hidden" name="w" value={w} />
                             <input type="hidden" name="employeeId" value={emp.id} />
+                            <input type="hidden" name="f" value={filterQS} />
                             <SubmitButton
                               size="sm"
                               disabled={!weekOver || readiness.flagged.length > 0}

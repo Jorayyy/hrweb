@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { and, gte, inArray, lte } from "drizzle-orm";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { attendanceDay, employee, holidayCalendar } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
@@ -30,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { approveWeek, reopenWeek } from "./actions";
+import { WeekPicker } from "./week-picker";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const PAGE_SIZE = 25;
@@ -130,9 +130,7 @@ export default async function DtrReviewPage({
   const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
   const pageRows = tableRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const weekLink = (monday: string) => `/dtr-review?w=${monday}`;
   const pageLink = (target: number) => `/dtr-review?w=${w}&page=${target}`;
-
   return (
     <>
       <PageHeader
@@ -144,16 +142,7 @@ export default async function DtrReviewPage({
           <Button asChild variant="outline" size="sm">
             <Link href="/payroll">Payroll</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={weekLink(addDays(w, -7))} aria-label="Previous week">
-              <ChevronLeft className="size-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={weekLink(addDays(w, 7))} aria-label="Next week">
-              <ChevronRight className="size-4" />
-            </Link>
-          </Button>
+          <WeekPicker w={w} today={todayKey} />
           <form action={approveWeek}>
             <input type="hidden" name="w" value={w} />
             <SubmitButton size="sm" disabled={!actionsEnabled}>

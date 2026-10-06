@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   CalendarDays,
+  ChevronDown,
   ChevronUp,
   ClipboardCheck,
   Clock3,
   LayoutDashboard,
   LogOut,
   ScanFace,
+  Settings,
   Settings2,
   Users,
   Wallet,
@@ -25,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { IconKey } from "@/lib/nav";
+import type { IconKey, NavChild } from "@/lib/nav";
 
 const ICONS: Record<IconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -36,10 +39,11 @@ const ICONS: Record<IconKey, LucideIcon> = {
   calendar: CalendarDays,
   wallet: Wallet,
   settings: Settings2,
+  setup: Settings,
 };
 
 type Props = {
-  items: { href: string; label: string; icon: IconKey }[];
+  items: { href: string; label: string; icon: IconKey; children?: readonly NavChild[] }[];
   user: { name: string | null; email: string | null; role: string };
   company: { name: string; logo: string | null };
 };
@@ -54,6 +58,7 @@ function initials(name: string): string {
 
 export function Sidebar({ items, user, company }: Props) {
   const pathname = usePathname();
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
 
   return (
     <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950 text-zinc-300">
@@ -77,6 +82,54 @@ export function Sidebar({ items, user, company }: Props) {
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {items.map((item) => {
           const Icon = ICONS[item.icon];
+
+          if (item.children) {
+            const childActive = item.children.some(
+              (child) => pathname === child.href || pathname.startsWith(`${child.href}/`)
+            );
+            const expanded = toggled[item.href] ?? childActive;
+            return (
+              <div key={item.href}>
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => setToggled((prev) => ({ ...prev, [item.href]: !expanded }))}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="flex-1 truncate text-left">{item.label}</span>
+                  <ChevronDown
+                    className={`size-3.5 shrink-0 text-zinc-500 transition-transform ${
+                      expanded ? "" : "-rotate-90"
+                    }`}
+                  />
+                </button>
+                {expanded ? (
+                  <div className="mt-0.5 space-y-0.5">
+                    {item.children.map((child) => {
+                      const active =
+                        pathname === child.href || pathname.startsWith(`${child.href}/`);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          aria-current={active ? "page" : undefined}
+                          className={`block truncate rounded-lg py-1.5 pl-11 pr-3 text-[13px] transition-colors ${
+                            active
+                              ? "bg-zinc-800 text-white"
+                              : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          }
+
           const active =
             item.href === "/"
               ? pathname === "/"

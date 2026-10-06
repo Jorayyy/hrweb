@@ -33,7 +33,7 @@ export async function addCostCenter(_prev: FormState, formData: FormData): Promi
     .returning({ id: costCenter.id });
   if (!row) return { errors: { code: "That code already exists." } };
 
-  revalidatePath("/setup");
+  revalidatePath("/", "layout");
   return null;
 }
 
@@ -59,7 +59,7 @@ export async function addCampaign(_prev: FormState, formData: FormData): Promise
     .returning({ id: campaign.id });
   if (!row) return { errors: { code: "That code already exists." } };
 
-  revalidatePath("/setup");
+  revalidatePath("/", "layout");
   return null;
 }
 
@@ -83,7 +83,7 @@ export async function addDepartment(_prev: FormState, formData: FormData): Promi
     .returning({ id: department.id });
   if (!row) return { errors: { code: "That code already exists." } };
 
-  revalidatePath("/setup");
+  revalidatePath("/", "layout");
   return null;
 }
 
@@ -107,7 +107,7 @@ export async function addJobPosition(_prev: FormState, formData: FormData): Prom
     .returning({ id: jobPosition.id });
   if (!row) return { errors: { code: "That code already exists." } };
 
-  revalidatePath("/setup");
+  revalidatePath("/", "layout");
   return null;
 }
 
@@ -130,14 +130,14 @@ export async function addBundyIp(_prev: FormState, formData: FormData): Promise<
     .returning({ id: bundyIp.id });
   if (!row) return { errors: { ip: "That IP is already registered." } };
 
-  revalidatePath("/setup");
+  revalidatePath("/", "layout");
   return null;
 }
 
 export async function removeBundyIp(id: number): Promise<void> {
   await requireRole("ADMIN", "HR");
   await db.delete(bundyIp).where(eq(bundyIp.id, id));
-  revalidatePath("/setup");
+  revalidatePath("/", "layout");
 }
 
 export async function addAnnouncement(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -158,14 +158,12 @@ export async function addAnnouncement(_prev: FormState, formData: FormData): Pro
     authorId: user.id,
   });
 
-  revalidatePath("/setup");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   return null;
 }
 
 export async function removeAnnouncement(id: number): Promise<void> {
   await requireRole("ADMIN", "HR");
   await db.delete(announcement).where(eq(announcement.id, id));
-  revalidatePath("/setup");
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }

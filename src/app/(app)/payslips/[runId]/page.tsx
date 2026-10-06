@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { campaign, employee, jobPosition, payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
@@ -49,7 +49,7 @@ export default async function PayslipDetailPage({
       and(
         eq(payrollRunItem.runId, runId),
         eq(payrollRunItem.employeeId, employeeId),
-        inArray(payrollRun.status, ["APPROVED", "POSTED"]),
+        eq(payrollRun.status, "POSTED"),
       ),
     )
     .limit(1);

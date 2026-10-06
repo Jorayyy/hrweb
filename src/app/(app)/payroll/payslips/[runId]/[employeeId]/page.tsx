@@ -62,7 +62,7 @@ export default async function PayslipPage({
     philhealthNo: row.philhealthNo,
     pagibigNo: row.pagibigNo,
   };
-  const backHref = `/payroll?period=${run.periodId}&run=${run.id}`;
+  const backHref = `/payroll/periods/${run.periodId}?run=${run.id}`;
 
   return (
     <>

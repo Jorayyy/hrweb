@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, count, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
   allowanceType,
@@ -20,7 +20,7 @@ import {
 } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { unreviewedOffenders } from "@/lib/attendance/review";
-import { field } from "@/lib/form";
+import { field, isIsoDate, oneOf } from "@/lib/form";
 import { isoWeek, manilaDateKey, manilaDayOfWeek, manilaToUtc } from "@/lib/time";
 import {
   calcEmployee,
@@ -29,6 +29,7 @@ import {
   type RunItemComputed,
   type StatConfig,
 } from "./calc";
+import { blockingFailures, periodReadiness } from "./readiness";
 import type { PayFrequency, PremiumRow } from "@/lib/statutory/ph";
 
 const PAYRULE_VERSION = "pay-2026.1";
@@ -47,10 +48,11 @@ function pad(n: number): string {
 }
 
 function back(periodId: number, runId?: number, error?: string): never {
-  const qs = new URLSearchParams({ period: String(periodId) });
+  const qs = new URLSearchParams();
   if (runId) qs.set("run", String(runId));
   if (error) qs.set("error", error);
-  redirect(`/payroll?${qs.toString()}`);
+  const suffix = qs.toString();
+  redirect(`/payroll/periods/${periodId}${suffix ? `?${suffix}` : ""}`);
 }
 
 async function upsertPeriod(values: {
@@ -188,6 +190,69 @@ export async function openPeriod(formData: FormData): Promise<never> {
 function todayParts(): [number, number, number] {
   const [y, m, d] = manilaDateKey(Date.now()).split("-").map(Number);
   return [y, m, d];
+}
+
+const PERIOD_FREQS = ["SEMI_MONTHLY", "MONTHLY", "WEEKLY", "DAILY"] as const;
+
+export async function createPeriod(formData: FormData): Promise<never> {
+  await requireRole("ADMIN", "PAYROLL");
+  const periodCode = field(formData, "periodCode");
+  const dateFrom = field(formData, "dateFrom");
+  const dateTo = field(formData, "dateTo");
+  const payDate = field(formData, "payDate");
+  const frequency = field(formData, "frequency");
+  function fail(message: string): never {
+    redirect(`/payroll?error=${encodeURIComponent(message)}`);
+  }
+
+  if (!oneOf(frequency, PERIOD_FREQS)) fail("Choose a pay frequency.");
+  if (!periodCode) fail("Period code is required.");
+  if (!isIsoDate(dateFrom) || !isIsoDate(dateTo)) fail("Dates must be in YYYY-MM-DD format.");
+  if (dateFrom > dateTo) fail("Start date must be on or before the end date.");
+  if (!isIsoDate(payDate)) fail("Pay date must be in YYYY-MM-DD format.");
+  if (payDate < dateTo) fail("Pay date cannot be before the cutoff ends.");
+
+  const [codeClash] = await db
+    .select({ code: payrollPeriod.periodCode })
+    .from(payrollPeriod)
+    .where(eq(payrollPeriod.periodCode, periodCode))
+    .limit(1);
+  if (codeClash) fail(`Period code ${periodCode} already exists.`);
+
+  const [overlap] = await db
+    .select({ code: payrollPeriod.periodCode })
+    .from(payrollPeriod)
+    .where(
+      and(
+        eq(payrollPeriod.frequency, frequency),
+        lte(payrollPeriod.dateFrom, dateTo),
+        gte(payrollPeriod.dateTo, dateFrom),
+      ),
+    )
+    .limit(1);
+  if (overlap) fail(`${periodCode} overlaps existing cutoff ${overlap.code}.`);
+
+  const [latest] = await db
+    .select({ dateTo: payrollPeriod.dateTo })
+    .from(payrollPeriod)
+    .where(eq(payrollPeriod.frequency, frequency))
+    .orderBy(desc(payrollPeriod.dateTo))
+    .limit(1);
+  if (!latest || dateFrom >= latest.dateTo) {
+    const gateError = await lastDtrGateError(frequency === "WEEKLY" ? "WEEKLY" : "SEMI_MONTHLY");
+    if (gateError) fail(gateError);
+  }
+
+  const [y, m, d] = dateTo.split("-").map(Number);
+  const id = await upsertPeriod({
+    periodCode,
+    dateFrom,
+    dateTo,
+    cutoffAt: new Date(manilaToUtc(y, m - 1, d, 23, 59)),
+    payDate,
+    frequency,
+  });
+  back(id);
 }
 
 export async function createRun(periodId: number): Promise<never> {
@@ -591,13 +656,20 @@ export async function transitionRun(
   if (!allowed || !allowed.includes(run.status))
     back(periodId, runId, `Cannot ${action} a run in status ${run.status}.`);
 
+  if (action === "approve" || action === "post") {
+    const readiness = await periodReadiness(periodId, runId);
+    const failedChecks = blockingFailures(readiness.checks);
+    if (failedChecks.length > 0)
+      back(
+        periodId,
+        runId,
+        `${action === "approve" ? "Approve" : "Post"} refused — ${failedChecks
+          .map((c) => c.label.toLowerCase())
+          .join(", ")}.`,
+      );
+  }
+
   if (action === "approve") {
-    const [failed] = await db
-      .select({ n: count() })
-      .from(payrollJob)
-      .where(and(eq(payrollJob.runId, runId), eq(payrollJob.status, "FAILED")));
-    if ((failed?.n ?? 0) > 0)
-      back(periodId, runId, `${failed.n} employee(s) failed to calculate — recalculate before approving.`);
     await db
       .update(payrollRun)
       .set({ status: "APPROVED", approvedBy: user.id, approvedAt: new Date() })

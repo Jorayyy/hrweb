@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
@@ -47,7 +47,7 @@ export default async function PayslipsPage() {
     .where(
       and(
         eq(payrollRunItem.employeeId, employeeId),
-        inArray(payrollRun.status, ["APPROVED", "POSTED"]),
+        eq(payrollRun.status, "POSTED"),
       ),
     )
     .orderBy(desc(payrollPeriod.payDate), desc(payrollRun.runNo));
@@ -56,14 +56,14 @@ export default async function PayslipsPage() {
     <>
       <PageHeader
         title="My Payslips"
-        description={`${rows.length} payslip${rows.length === 1 ? "" : "s"} · approved runs only`}
+        description={`${rows.length} payslip${rows.length === 1 ? "" : "s"} · posted runs only`}
       />
       <PageBody>
         <Card>
           <CardContent className="pt-6">
             {rows.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
-                No payslips yet — they appear here once payroll is approved.
+                No payslips yet — they appear here once payroll is posted.
               </p>
             ) : (
               <Table>

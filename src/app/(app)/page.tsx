@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lte, or, sum } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, lte, or, sum } from "drizzle-orm";
 import { db } from "@/db";
 import {
   announcement,
@@ -114,7 +114,7 @@ export default async function Dashboard() {
               .where(
                 and(
                   eq(payrollRunItem.employeeId, employeeId),
-                  inArray(payrollRun.status, ["APPROVED", "POSTED"]),
+                  eq(payrollRun.status, "POSTED"),
                 ),
               )
               .orderBy(desc(payrollPeriod.payDate))

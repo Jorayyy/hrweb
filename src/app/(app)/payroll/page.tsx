@@ -1,32 +1,32 @@
 import Link from "next/link";
-import { count, desc, eq } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
+import { ChevronRight } from "lucide-react";
 import { db } from "@/db";
-import { employee, payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
+import { payrollPeriod, payrollRun } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
-import { formatDate, formatPhp } from "@/lib/money";
+import { formatDate } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { selectCx } from "@/components/ui/field";
+import { Field, selectCx } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CalculateButton } from "./calculate-button";
-import { calculateRun, createRun, openPeriod, transitionRun } from "./actions";
+import { createPeriod, createRun, openPeriod } from "./actions";
 
-const PAGE_SIZE = 25;
+const FREQS = ["SEMI_MONTHLY", "MONTHLY", "WEEKLY", "DAILY"] as const;
 
 export default async function PayrollPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ period?: string; run?: string; page?: string; error?: string }>;
+  searchParams?: Promise<{ error?: string }>;
 }) {
   await requireRole("ADMIN", "PAYROLL");
 
@@ -37,58 +37,26 @@ export default async function PayrollPage({
     .select()
     .from(payrollPeriod)
     .orderBy(desc(payrollPeriod.dateFrom))
-    .limit(12);
+    .limit(50);
 
-  const periodId = Number(params.period) || periods[0]?.id || 0;
-  const period = periods.find((p) => p.id === periodId) ?? null;
-
-  const runs = period
-    ? await db
-        .select()
-        .from(payrollRun)
-        .where(eq(payrollRun.periodId, period.id))
-        .orderBy(desc(payrollRun.runNo))
-    : [];
-  const run = runs.find((r) => r.id === Number(params.run)) ?? runs[0] ?? null;
-
-  const totalItems = run
-    ? (
-        await db
-          .select({ n: count() })
-          .from(payrollRunItem)
-          .where(eq(payrollRunItem.runId, run.id))
-      )[0].n
-    : 0;
-  const pages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
-  const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
-
-  const items =
-    run && period
+  const runs =
+    periods.length > 0
       ? await db
-          .select({
-            item: payrollRunItem,
-            firstName: employee.firstName,
-            lastName: employee.lastName,
-            employeeNo: employee.employeeNo,
-          })
-          .from(payrollRunItem)
-          .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
-          .where(eq(payrollRunItem.runId, run.id))
-          .orderBy(employee.lastName, employee.firstName)
-          .limit(PAGE_SIZE)
-          .offset((page - 1) * PAGE_SIZE)
+          .select({ id: payrollRun.id, periodId: payrollRun.periodId, status: payrollRun.status })
+          .from(payrollRun)
+          .where(inArray(payrollRun.periodId, periods.map((p) => p.id)))
+          .orderBy(desc(payrollRun.runNo))
       : [];
-
-  const registerHref = (target: number) =>
-    `/payroll?period=${periodId}&run=${run?.id ?? ""}&page=${target}`;
+  const byPeriod = new Map<number, { n: number; latest: (typeof runs)[number] }>();
+  for (const r of runs) {
+    const existing = byPeriod.get(r.periodId);
+    if (existing) existing.n += 1;
+    else byPeriod.set(r.periodId, { n: 1, latest: r });
+  }
 
   return (
     <>
-      <PageHeader
-        back
-        title="Payroll"
-        description="Periods, cutoff runs, registers and payslips"
-      >
+      <PageHeader title="Payroll" description="Cutoff periods, runs and registers">
         <form action={openPeriod} className="flex items-center gap-2">
           <select name="frequency" defaultValue="SEMI_MONTHLY" className={`${selectCx} h-8 w-40`}>
             <option value="SEMI_MONTHLY">Semi-monthly</option>
@@ -104,7 +72,7 @@ export default async function PayrollPage({
         {error ? (
           <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             <span>{error}</span>
-            {error.startsWith("DTR not approved") ? (
+            {error.includes("DTR not approved") ? (
               <Button asChild variant="outline" size="sm" className="shrink-0">
                 <Link href="/dtr-review">Open DTR Review</Link>
               </Button>
@@ -118,7 +86,7 @@ export default async function PayrollPage({
               <CardTitle>Cutoff periods</CardTitle>
               <CardDescription>
                 Semi-monthly: 1–15th (pay 25th) and 16–last day (pay 10th). Weekly: Mon–Sun, paid
-                7 days after cutoff.
+                7 days after cutoff. Open a period to see its runs, register and pre-post checks.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -134,132 +102,53 @@ export default async function PayrollPage({
                       <TableHead>Dates</TableHead>
                       <TableHead>Pay date</TableHead>
                       <TableHead>Frequency</TableHead>
+                      <TableHead>Latest run</TableHead>
                       <TableHead className="text-right">Runs</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {periods.map((p) => (
-                      <TableRow
-                        key={p.id}
-                        className={p.id === periodId ? "bg-muted/50" : undefined}
-                      >
-                        <TableCell>
-                          <a
-                            href={`/payroll?period=${p.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {p.periodCode}
-                          </a>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(p.dateFrom)} – {formatDate(p.dateTo)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(p.payDate)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{p.frequency}</TableCell>
-                        <TableCell className="text-right">
-                          <form
-                            action={createRun.bind(null, p.id)}
-                            className="inline-flex items-center gap-2"
-                          >
-                            <span className="text-muted-foreground">
-                              {runs.length > 0 && p.id === periodId ? runs.length : "—"}
-                            </span>
-                            <Button type="submit" variant="outline" size="sm">
-                              New run
-                            </Button>
-                          </form>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {period && runs.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Runs — {period.periodCode}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Run</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Headcount</TableHead>
-                      <TableHead className="text-right">Gross</TableHead>
-                      <TableHead className="text-right">Deductions</TableHead>
-                      <TableHead className="text-right">Net</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {runs.map((r) => {
-                      const selected = run?.id === r.id;
-                      const mutable = r.status !== "POSTED" && r.status !== "VOID";
-                      const recalculable = ["OPEN", "CUT_OFF", "CALCULATED", "REVIEW"].includes(
-                        r.status,
-                      );
+                    {periods.map((p) => {
+                      const stat = byPeriod.get(p.id);
                       return (
-                        <TableRow key={r.id} className={selected ? "bg-muted/50" : undefined}>
+                        <TableRow key={p.id}>
                           <TableCell>
-                            <a
-                              href={`/payroll?period=${period.id}&run=${r.id}`}
+                            <Link
+                              href={`/payroll/periods/${p.id}`}
                               className="font-medium hover:underline"
                             >
-                              #{r.runNo}
-                            </a>
+                              {p.periodCode}
+                            </Link>
                           </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(p.dateFrom)} – {formatDate(p.dateTo)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(p.payDate)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{p.frequency}</TableCell>
                           <TableCell>
-                            <StatusBadge status={r.status} />
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {r.headcount ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {r.grossTotal != null ? formatPhp(r.grossTotal) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {r.deductionTotal != null ? formatPhp(r.deductionTotal) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {r.netTotal != null ? formatPhp(r.netTotal) : "—"}
+                            {stat ? (
+                              <StatusBadge status={stat.latest.status} />
+                            ) : (
+                              <span className="text-muted-foreground">No runs</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              {selected && recalculable ? (
-                                <CalculateButton
-                                  action={calculateRun.bind(null, period.id, r.id)}
-                                  runId={r.id}
-                                />
-                              ) : null}
-                              {selected && ["CALCULATED", "REVIEW"].includes(r.status) ? (
-                                <form
-                                  action={transitionRun.bind(null, period.id, r.id, "approve")}
-                                >
-                                  <Button type="submit" variant="outline" size="sm">
-                                    Approve
-                                  </Button>
-                                </form>
-                              ) : null}
-                              {selected && r.status === "APPROVED" ? (
-                                <form action={transitionRun.bind(null, period.id, r.id, "post")}>
-                                  <Button type="submit" size="sm">
-                                    Post
-                                  </Button>
-                                </form>
-                              ) : null}
-                              {selected && mutable ? (
-                                <form action={transitionRun.bind(null, period.id, r.id, "void")}>
-                                  <Button type="submit" variant="ghost" size="sm">
-                                    Void
-                                  </Button>
-                                </form>
-                              ) : null}
+                            <div className="inline-flex items-center justify-end gap-2">
+                              <span className="tabular-nums text-muted-foreground">
+                                {stat?.n ?? 0}
+                              </span>
+                              <form action={createRun.bind(null, p.id)} className="inline">
+                                <Button type="submit" variant="outline" size="sm">
+                                  New run
+                                </Button>
+                              </form>
+                              <Button asChild variant="ghost" size="sm">
+                                <Link href={`/payroll/periods/${p.id}`}>
+                                  Open
+                                  <ChevronRight className="size-3.5" />
+                                </Link>
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -267,129 +156,47 @@ export default async function PayrollPage({
                     })}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          ) : null}
+              )}
 
-          {run && period ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  Register — {period.periodCode} run #{run.runNo}
-                </CardTitle>
-                <CardDescription>
-                  {totalItems} employee{totalItems === 1 ? "" : "s"} · pay date{" "}
-                  {formatDate(period.payDate)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {items.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-muted-foreground">
-                    Run has no calculated rows yet — hit Calculate above.
-                  </p>
-                ) : (
-                  <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead className="text-right">Days</TableHead>
-                          <TableHead className="text-right">Abs</TableHead>
-                          <TableHead className="text-right">OT h</TableHead>
-                          <TableHead className="text-right">NSD h</TableHead>
-                          <TableHead className="text-right">Gross</TableHead>
-                          <TableHead className="text-right">Deductions</TableHead>
-                          <TableHead className="text-right">Net pay</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((r) => {
-                          const otHours =
-                            r.item.hoursOtOrd +
-                            r.item.hoursOtRd +
-                            r.item.hoursOtSpecl +
-                            r.item.hoursOtRh +
-                            r.item.hoursOtRhRd;
-                          return (
-                            <TableRow key={r.item.employeeId}>
-                              <TableCell>
-                                <a
-                                  href={`/payroll/payslips/${run.id}/${r.item.employeeId}`}
-                                  className="hover:underline"
-                                >
-                                  <span className="block font-medium">
-                                    {r.lastName}, {r.firstName}
-                                  </span>
-                                  <span className="block text-xs text-muted-foreground">
-                                    {r.employeeNo}
-                                  </span>
-                                </a>
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {r.item.daysWorked}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {r.item.daysAbsent}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {otHours > 0 ? otHours.toFixed(2) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {r.item.hoursNsd > 0 ? r.item.hoursNsd.toFixed(2) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatPhp(r.item.grossPay)}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatPhp(r.item.totalDeductions)}
-                              </TableCell>
-                              <TableCell className="text-right font-medium tabular-nums">
-                                {formatPhp(r.item.netPay)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                      <TableFooter>
-                        <TableRow>
-                          <TableCell colSpan={5}>Run totals</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {run.grossTotal != null ? formatPhp(run.grossTotal) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {run.deductionTotal != null ? formatPhp(run.deductionTotal) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {run.netTotal != null ? formatPhp(run.netTotal) : "—"}
-                          </TableCell>
-                        </TableRow>
-                      </TableFooter>
-                    </Table>
-
-                    {pages > 1 ? (
-                      <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
-                        <span className="text-muted-foreground">
-                          Page {page} of {pages} · {totalItems} employees
-                        </span>
-                        <div className="flex gap-2">
-                          {page > 1 ? (
-                            <Button asChild variant="outline" size="sm">
-                              <a href={registerHref(page - 1)}>Previous</a>
-                            </Button>
-                          ) : null}
-                          {page < pages ? (
-                            <Button asChild variant="outline" size="sm">
-                              <a href={registerHref(page + 1)}>Next</a>
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
+              <details className="group mt-4 rounded-lg border border-border">
+                <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+                  <span>Open a custom period</span>
+                  <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
+                </summary>
+                <form
+                  action={createPeriod}
+                  className="grid gap-3 border-t border-border p-4 sm:grid-cols-2 lg:grid-cols-6"
+                >
+                  <Field label="Period code" name="periodCode" className="lg:col-span-1">
+                    <Input id="periodCode" name="periodCode" placeholder="2026-09-C" required />
+                  </Field>
+                  <Field label="Date from" name="dateFrom">
+                    <Input id="dateFrom" name="dateFrom" type="date" required />
+                  </Field>
+                  <Field label="Date to" name="dateTo">
+                    <Input id="dateTo" name="dateTo" type="date" required />
+                  </Field>
+                  <Field label="Pay date" name="payDate">
+                    <Input id="payDate" name="payDate" type="date" required />
+                  </Field>
+                  <Field label="Frequency" name="frequency">
+                    <select id="frequency" name="frequency" defaultValue="SEMI_MONTHLY" className={selectCx}>
+                      {FREQS.map((f) => (
+                        <option key={f} value={f}>
+                          {f.replace("_", " ").toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="flex items-end">
+                    <Button type="submit" size="sm" className="w-full">
+                      Create period
+                    </Button>
+                  </div>
+                </form>
+              </details>
+            </CardContent>
+          </Card>
         </div>
       </PageBody>
     </>

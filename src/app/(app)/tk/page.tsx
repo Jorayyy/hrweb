@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { and, gte, inArray, lte } from "drizzle-orm";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
-import { attendanceDay, employee, shiftTemplate } from "@/db/schema";
+import { attendanceDay, campaign, costCenter, department, employee, shiftTemplate } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import {
   addDays,
+  employeeFilterConditions,
+  encodeDtrFilter,
   mondayOf,
+  parseDtrFilter,
   requiredDates,
 } from "@/lib/attendance/review";
 import { isIsoDate } from "@/lib/form";
 import { formatDate } from "@/lib/money";
 import { isoWeek, MANILA_OFFSET_MS, manilaDateKey } from "@/lib/time";
+import { EmployeeFilters } from "@/components/employee-filters";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +76,9 @@ export default async function TimekeepingPage({
     page?: string;
     emp?: string;
     q?: string;
+    campaign?: string;
+    dept?: string;
+    cc?: string;
     error?: string;
     ok?: string;
   }>;
@@ -85,14 +92,13 @@ export default async function TimekeepingPage({
     : mondayOf(todayKey);
   const to = addDays(w, 6);
   const empFilter = /^\d+$/.test(params.emp ?? "") ? Number(params.emp) : null;
-  const qRaw = (params.q ?? "").trim();
-  const q = qRaw.toLowerCase();
+  const filter = parseDtrFilter(params);
   const weekLabel = (() => {
     const { year, week } = isoWeek(Date.parse(`${w}T12:00:00Z`));
     return `${year}-W${String(week).padStart(2, "0")}`;
   })();
 
-  const [emps, rows, shifts] = await Promise.all([
+  const [emps, rows, shifts, campaigns, departments, costCenters] = await Promise.all([
     db
       .select({
         id: employee.id,
@@ -104,13 +110,18 @@ export default async function TimekeepingPage({
         shiftTemplateId: employee.shiftTemplateId,
       })
       .from(employee)
-      .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]))
+      .where(
+        and(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]), ...employeeFilterConditions(filter)),
+      )
       .orderBy(employee.lastName, employee.firstName),
     db
       .select()
       .from(attendanceDay)
       .where(and(gte(attendanceDay.workDate, w), lte(attendanceDay.workDate, to))),
     db.select().from(shiftTemplate),
+    db.select({ id: campaign.id, name: campaign.name }).from(campaign).orderBy(campaign.name),
+    db.select({ id: department.id, name: department.name }).from(department).orderBy(department.name),
+    db.select({ id: costCenter.id, name: costCenter.name }).from(costCenter).orderBy(costCenter.name),
   ]);
 
   const byEmp = new Map<number, Row[]>();
@@ -122,11 +133,7 @@ export default async function TimekeepingPage({
   const shiftById = new Map(shifts.map((s) => [s.id, s]));
 
   const issues = emps
-    .filter((e) => {
-      if (empFilter !== null && e.id !== empFilter) return false;
-      if (!q) return true;
-      return `${e.firstName} ${e.lastName} ${e.employeeNo}`.toLowerCase().includes(q);
-    })
+    .filter((e) => empFilter === null || e.id === empFilter)
     .flatMap((emp) => {
       const empRows = byEmp.get(emp.id) ?? [];
       const byDate = new Map(empRows.map((r) => [r.workDate, r]));
@@ -153,11 +160,12 @@ export default async function TimekeepingPage({
   const page = Math.min(Math.max(1, Number(params.page) || 1), pages);
   const pageIssues = issues.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const filterQS = encodeDtrFilter(filter);
   const filterQs = (opts: { week?: string; page?: number } = {}): string => {
-    const qs = new URLSearchParams({ w: opts.week ?? w });
+    const qs = new URLSearchParams(filterQS);
+    qs.set("w", opts.week ?? w);
     if (opts.page) qs.set("page", String(opts.page));
     if (empFilter !== null) qs.set("emp", String(empFilter));
-    if (qRaw) qs.set("q", qRaw);
     return `/tk?${qs.toString()}`;
   };
   const weekLink = (monday: string) => filterQs({ week: monday });
@@ -199,45 +207,31 @@ export default async function TimekeepingPage({
           </div>
         ) : null}
 
-        {empFilter !== null || qRaw ? (
+        {empFilter !== null ? (
           <div className="mb-4 flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
-            <span className="truncate">
-              {empFilter !== null ? "Filtered to one employee" : "Showing matches"}
-              {qRaw ? ` for “${qRaw}”` : ""}.
-            </span>
+            <span className="truncate">Filtered to one employee.</span>
             <Link
-              href={`/tk?w=${w}`}
+              href={`/tk?w=${w}${filterQS ? `&${filterQS}` : ""}`}
               className="shrink-0 text-sm underline-offset-2 hover:underline"
             >
-              Clear filters
+              Clear
             </Link>
           </div>
         ) : null}
 
-        <form method="get" className="mb-4 flex max-w-md items-center gap-2">
-          <input type="hidden" name="w" value={w} />
-          {empFilter !== null ? (
-            <input type="hidden" name="emp" value={empFilter} />
-          ) : null}
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              name="q"
-              defaultValue={qRaw}
-              placeholder="Search name or employee no."
-              className="pl-8"
-            />
-          </div>
-          <Button type="submit" variant="outline" size="sm">
-            Search
-          </Button>
-        </form>
+        <div className="mb-4">
+          <EmployeeFilters
+            campaigns={campaigns}
+            departments={departments}
+            costCenters={costCenters}
+          />
+        </div>
 
         {issues.length === 0 ? (
           <Card>
             <CardContent>
               <p className="py-10 text-center text-sm text-muted-foreground">
-                {qRaw ? "No employees with issues match your search." : "No missing or flagged days this week."}
+                {filter.q ? `No employees with issues match “${filter.q}”.` : "No missing or flagged days this week."}
               </p>
             </CardContent>
           </Card>

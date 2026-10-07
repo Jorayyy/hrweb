@@ -1,3 +1,5 @@
+import { eq, ilike, or, type SQL } from "drizzle-orm";
+import { employee } from "@/db/schema";
 import { dateKeyDayOfWeek } from "./anchor";
 
 const DAY_MS = 86_400_000;
@@ -44,16 +46,22 @@ export function requiredDates(opts: {
   );
 }
 
-export type DtrFilter = { campaignId: number; deptId: number; q: string };
+export type DtrFilter = { campaignId: number; deptId: number; ccId: number; q: string };
 
-/** Whitelists campaign/dept/q from a raw query string (e.g. a hidden form field). */
-export function parseDtrFilter(f: string): DtrFilter {
-  const src = new URLSearchParams(f);
-  const campaign = src.get("campaign") ?? "";
-  const dept = src.get("dept") ?? "";
+function idOf(v: string | undefined): number {
+  return v && /^\d+$/.test(v) ? Number(v) : 0;
+}
+
+/** Whitelists campaign/dept/cost-center/q from a query string or a parsed params object. */
+export function parseDtrFilter(f: string | Record<string, string | undefined>): DtrFilter {
+  const src = new URLSearchParams(typeof f === "string" ? f : "");
+  if (typeof f !== "string") {
+    for (const [k, v] of Object.entries(f)) if (v) src.set(k, v);
+  }
   return {
-    campaignId: /^\d+$/.test(campaign) ? Number(campaign) : 0,
-    deptId: /^\d+$/.test(dept) ? Number(dept) : 0,
+    campaignId: idOf(src.get("campaign") ?? undefined),
+    deptId: idOf(src.get("dept") ?? undefined),
+    ccId: idOf(src.get("cc") ?? undefined),
     q: (src.get("q") ?? "").trim().toLowerCase().slice(0, 50),
   };
 }
@@ -62,8 +70,13 @@ export function encodeDtrFilter(fl: DtrFilter): string {
   const p = new URLSearchParams();
   if (fl.campaignId) p.set("campaign", String(fl.campaignId));
   if (fl.deptId) p.set("dept", String(fl.deptId));
+  if (fl.ccId) p.set("cc", String(fl.ccId));
   if (fl.q) p.set("q", fl.q);
   return p.toString();
+}
+
+export function hasEmployeeFilter(fl: DtrFilter): boolean {
+  return Boolean(fl.campaignId || fl.deptId || fl.ccId || fl.q);
 }
 
 export function matchFilteredEmployee(
@@ -74,13 +87,47 @@ export function matchFilteredEmployee(
     employeeNo: string;
     campaignId: number | null;
     departmentId: number | null;
+    costCenterId: number | null;
   },
 ): boolean {
   if (fl.campaignId && e.campaignId !== fl.campaignId) return false;
   if (fl.deptId && e.departmentId !== fl.deptId) return false;
-  if (fl.q && !`${e.firstName} ${e.lastName} ${e.employeeNo}`.toLowerCase().includes(fl.q))
-    return false;
+  if (fl.ccId && e.costCenterId !== fl.ccId) return false;
+  if (fl.q && !matchesQuery(fl.q, e)) return false;
   return true;
+}
+
+function matchesQuery(
+  q: string,
+  e: { firstName: string; lastName: string; employeeNo: string },
+): boolean {
+  return (
+    e.firstName.toLowerCase().includes(q) ||
+    e.lastName.toLowerCase().includes(q) ||
+    e.employeeNo.toLowerCase().includes(q)
+  );
+}
+
+/**
+ * SQL conditions matching `matchFilteredEmployee` — push these into the query
+ * instead of filtering a full employee list in memory.
+ */
+export function employeeFilterConditions(fl: DtrFilter): SQL[] {
+  const out: SQL[] = [];
+  if (fl.campaignId) out.push(eq(employee.campaignId, fl.campaignId));
+  if (fl.deptId) out.push(eq(employee.departmentId, fl.deptId));
+  if (fl.ccId) out.push(eq(employee.costCenterId, fl.ccId));
+  if (fl.q) {
+    const pattern = `%${fl.q}%`;
+    out.push(
+      or(
+        ilike(employee.firstName, pattern),
+        ilike(employee.lastName, pattern),
+        ilike(employee.employeeNo, pattern),
+      )!,
+    );
+  }
+  return out;
 }
 
 export type WeekReadiness = {

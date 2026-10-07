@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { and, count, eq, ilike, or } from "drizzle-orm";
-import { Pencil, Search } from "lucide-react";
+import { and, count, eq, or } from "drizzle-orm";
+import { Pencil } from "lucide-react";
 import { db } from "@/db";
-import { attendanceDay, attendanceStatus, employee } from "@/db/schema";
+import { attendanceDay, attendanceStatus, campaign, costCenter, department, employee } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
+import { employeeFilterConditions, parseDtrFilter } from "@/lib/attendance/review";
 import { isIsoDate, intOrNull, oneOf } from "@/lib/form";
 import { MANILA_OFFSET_MS, manilaDateKey } from "@/lib/time";
+import { EmployeeFilters } from "@/components/employee-filters";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge, humanize } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +44,15 @@ function hours(seconds: number): string {
 export default async function AttendancePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ date?: string; status?: string; q?: string; edit?: string }>;
+  searchParams?: Promise<{
+    date?: string;
+    status?: string;
+    q?: string;
+    campaign?: string;
+    dept?: string;
+    cc?: string;
+    edit?: string;
+  }>;
 }) {
   await requireRole("ADMIN", "HR");
 
@@ -50,26 +60,24 @@ export default async function AttendancePage({
   const date = isIsoDate(params.date ?? "") ? (params.date as string) : today();
   const statuses = attendanceStatus.enumValues;
   const activeStatus = oneOf(params.status ?? "", statuses) ? (params.status as string) : "";
-  const q = (params.q ?? "").trim();
   const editId = intOrNull(params.edit ?? "");
-
-  const summary = await db
-    .select({ status: attendanceDay.status, n: count() })
-    .from(attendanceDay)
-    .where(eq(attendanceDay.workDate, date))
-    .groupBy(attendanceDay.status);
+  const filter = parseDtrFilter(params);
 
   const conditions = [eq(attendanceDay.workDate, date)];
   if (activeStatus) conditions.push(eq(attendanceDay.status, activeStatus as (typeof statuses)[number]));
-  if (q) {
-    conditions.push(
-      or(
-        ilike(employee.firstName, `%${q}%`),
-        ilike(employee.lastName, `%${q}%`),
-        ilike(employee.employeeNo, `%${q}%`),
-      )!,
-    );
-  }
+  conditions.push(...employeeFilterConditions(filter));
+
+  const [summary, campaigns, departments, costCenters] = await Promise.all([
+    db
+      .select({ status: attendanceDay.status, n: count() })
+      .from(attendanceDay)
+      .innerJoin(employee, eq(attendanceDay.employeeId, employee.id))
+      .where(and(...conditions))
+      .groupBy(attendanceDay.status),
+    db.select({ id: campaign.id, name: campaign.name }).from(campaign).orderBy(campaign.name),
+    db.select({ id: department.id, name: department.name }).from(department).orderBy(department.name),
+    db.select({ id: costCenter.id, name: costCenter.name }).from(costCenter).orderBy(costCenter.name),
+  ]);
 
   const rows = await db
     .select({
@@ -178,29 +186,31 @@ export default async function AttendancePage({
           <Card>
             <CardHeader>
               <CardTitle>Daily log</CardTitle>
-              <form method="get" className="mt-3 flex flex-wrap items-center gap-2">
-                <Input name="date" type="date" defaultValue={date} className="w-auto" />
-                <div className="relative min-w-56 flex-1">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    name="q"
-                    defaultValue={q}
-                    placeholder="Search name or employee no."
-                    className="pl-8"
-                  />
-                </div>
-                <select name="status" defaultValue={activeStatus} className={selectCx}>
-                  <option value="">All statuses</option>
-                  {statuses.map((s) => (
-                    <option key={s} value={s}>
-                      {humanize(s)}
-                    </option>
-                  ))}
-                </select>
-                <Button type="submit" variant="outline" size="sm">
-                  Filter
-                </Button>
-              </form>
+              <div className="mt-3 space-y-2">
+                <EmployeeFilters
+                  campaigns={campaigns}
+                  departments={departments}
+                  costCenters={costCenters}
+                />
+                <form method="get" className="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="campaign" value={filter.campaignId || ""} />
+                  <input type="hidden" name="dept" value={filter.deptId || ""} />
+                  <input type="hidden" name="cc" value={filter.ccId || ""} />
+                  <input type="hidden" name="q" value={filter.q} />
+                  <Input name="date" type="date" defaultValue={date} className="w-auto" />
+                  <select name="status" defaultValue={activeStatus} className={selectCx}>
+                    <option value="">All statuses</option>
+                    {statuses.map((s) => (
+                      <option key={s} value={s}>
+                        {humanize(s)}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" variant="outline" size="sm">
+                    Filter
+                  </Button>
+                </form>
+              </div>
             </CardHeader>
 
             <CardContent>

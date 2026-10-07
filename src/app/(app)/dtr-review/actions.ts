@@ -17,6 +17,7 @@ function back(w: string, error?: string, ok?: string, f = ""): never {
   const fl = parseDtrFilter(f);
   if (fl.campaignId) qs.set("campaign", String(fl.campaignId));
   if (fl.deptId) qs.set("dept", String(fl.deptId));
+  if (fl.ccId) qs.set("cc", String(fl.ccId));
   if (fl.q) qs.set("q", fl.q);
   redirect(`/dtr-review?${qs.toString()}`);
 }

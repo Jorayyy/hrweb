@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 
 type Opt = { id: number; name: string };
 
-export function DtrFilters({
+export function EmployeeFilters({
   campaigns,
   departments,
+  costCenters,
 }: {
   campaigns: Opt[];
   departments: Opt[];
+  costCenters?: Opt[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -33,10 +35,11 @@ export function DtrFilters({
 
   const campaign = sp.get("campaign") ?? "";
   const dept = sp.get("dept") ?? "";
-  const active = Boolean(campaign || dept || (sp.get("q") ?? "").trim());
+  const cc = sp.get("cc") ?? "";
+  const active = Boolean(campaign || dept || cc || (sp.get("q") ?? "").trim());
 
   return (
-    <div className={`mb-4 flex flex-wrap items-center gap-2 ${pending ? "opacity-60" : ""}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${pending ? "opacity-60" : ""}`}>
       <select
         aria-label="Filter by campaign"
         value={campaign}
@@ -63,6 +66,21 @@ export function DtrFilters({
           </option>
         ))}
       </select>
+      {costCenters ? (
+        <select
+          aria-label="Filter by cost center"
+          value={cc}
+          onChange={(e) => go({ cc: e.target.value })}
+          className={`${selectCx} w-44 cursor-pointer`}
+        >
+          <option value="">All cost centers</option>
+          {costCenters.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      ) : null}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -84,7 +102,7 @@ export function DtrFilters({
           type="button"
           onClick={() => {
             setQ("");
-            go({ campaign: "", dept: "", q: "" });
+            go({ campaign: "", dept: "", cc: "", q: "" });
           }}
           className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >

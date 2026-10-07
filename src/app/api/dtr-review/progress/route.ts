@@ -37,6 +37,7 @@ export async function GET(req: Request) {
         weeklyRestDays: employee.weeklyRestDays,
         campaignId: employee.campaignId,
         departmentId: employee.departmentId,
+        costCenterId: employee.costCenterId,
       })
       .from(employee)
       .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"])),

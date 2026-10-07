@@ -1,11 +1,98 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  encodeDtrFilter,
+  hasEmployeeFilter,
+  matchFilteredEmployee,
   mondayOf,
+  parseDtrFilter,
   requiredDates,
   unreviewedOffenders,
   weekReadiness,
+  type DtrFilter,
 } from "./review";
+
+describe("parseDtrFilter", () => {
+  it("reads ids and a lowercased q from a query string", () => {
+    expect(parseDtrFilter("campaign=7&dept=3&cc=9&q=%20Telus%20")).toEqual({
+      campaignId: 7,
+      deptId: 3,
+      ccId: 9,
+      q: "telus",
+    });
+  });
+
+  it("reads from a parsed params object", () => {
+    expect(parseDtrFilter({ campaign: "12", dept: undefined, cc: "", q: "DOE" })).toEqual({
+      campaignId: 12,
+      deptId: 0,
+      ccId: 0,
+      q: "doe",
+    });
+  });
+
+  it("rejects junk ids and over-long queries", () => {
+    expect(parseDtrFilter({ campaign: "abc", dept: "-1", cc: "1.5" })).toEqual({
+      campaignId: 0,
+      deptId: 0,
+      ccId: 0,
+      q: "",
+    });
+    expect(parseDtrFilter({ q: "x".repeat(200) }).q).toHaveLength(50);
+  });
+});
+
+describe("encodeDtrFilter", () => {
+  it("round-trips through parseDtrFilter", () => {
+    const fl = parseDtrFilter("campaign=1&dept=2&cc=3&q=abc");
+    expect(parseDtrFilter(encodeDtrFilter(fl))).toEqual(fl);
+  });
+
+  it("omits zeroed filters", () => {
+    expect(encodeDtrFilter({ campaignId: 0, deptId: 0, ccId: 0, q: "" })).toBe("");
+  });
+});
+
+describe("hasEmployeeFilter", () => {
+  const empty: DtrFilter = { campaignId: 0, deptId: 0, ccId: 0, q: "" };
+  it("is false only when every dimension is empty", () => {
+    expect(hasEmployeeFilter(empty)).toBe(false);
+    expect(hasEmployeeFilter({ ...empty, ccId: 4 })).toBe(true);
+    expect(hasEmployeeFilter({ ...empty, q: "x" })).toBe(true);
+  });
+});
+
+describe("matchFilteredEmployee", () => {
+  const emp = {
+    firstName: "Juan",
+    lastName: "Dela Cruz",
+    employeeNo: "E-0042",
+    campaignId: 7,
+    departmentId: 3,
+    costCenterId: 9,
+  };
+  const none: DtrFilter = { campaignId: 0, deptId: 0, ccId: 0, q: "" };
+
+  it("matches everything when the filter is empty", () => {
+    expect(matchFilteredEmployee(none, emp)).toBe(true);
+  });
+
+  it("applies campaign, department and cost center", () => {
+    expect(matchFilteredEmployee({ ...none, campaignId: 7 }, emp)).toBe(true);
+    expect(matchFilteredEmployee({ ...none, campaignId: 8 }, emp)).toBe(false);
+    expect(matchFilteredEmployee({ ...none, deptId: 3 }, emp)).toBe(true);
+    expect(matchFilteredEmployee({ ...none, deptId: 4 }, emp)).toBe(false);
+    expect(matchFilteredEmployee({ ...none, ccId: 9 }, emp)).toBe(true);
+    expect(matchFilteredEmployee({ ...none, ccId: 10 }, emp)).toBe(false);
+  });
+
+  it("matches q against any single name or employee number field", () => {
+    expect(matchFilteredEmployee({ ...none, q: "juan" }, emp)).toBe(true);
+    expect(matchFilteredEmployee({ ...none, q: "cruz" }, emp)).toBe(true);
+    expect(matchFilteredEmployee({ ...none, q: "0042" }, emp)).toBe(true);
+    expect(matchFilteredEmployee({ ...none, q: "maria" }, emp)).toBe(false);
+  });
+});
 
 describe("mondayOf", () => {
   it("snaps any day back to its Monday", () => {

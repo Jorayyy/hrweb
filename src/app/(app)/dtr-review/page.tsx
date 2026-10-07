@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { and, gte, inArray, lte } from "drizzle-orm";
+import { and, count, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { attendanceDay, campaign, department, employee, holidayCalendar } from "@/db/schema";
+import { attendanceDay, campaign, costCenter, department, employee, holidayCalendar } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import {
   addDays,
   dateRange,
+  employeeFilterConditions,
   encodeDtrFilter,
-  matchFilteredEmployee,
+  hasEmployeeFilter,
   mondayOf,
+  parseDtrFilter,
   requiredDates,
   weekReadiness,
 } from "@/lib/attendance/review";
@@ -30,8 +32,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { EmployeeFilters } from "@/components/employee-filters";
 import { approveWeek, reopenWeek } from "./actions";
-import { DtrFilters } from "./filters";
 import { WeekPicker } from "./week-picker";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -60,6 +62,7 @@ export default async function DtrReviewPage({
     ok?: string;
     campaign?: string;
     dept?: string;
+    cc?: string;
     q?: string;
   }>;
 }) {
@@ -79,13 +82,10 @@ export default async function DtrReviewPage({
     return `${year}-W${String(week).padStart(2, "0")}`;
   })();
 
-  const campaignId = /^\d+$/.test(params.campaign ?? "") ? Number(params.campaign) : 0;
-  const deptId = /^\d+$/.test(params.dept ?? "") ? Number(params.dept) : 0;
-  const q = (params.q ?? "").trim().toLowerCase().slice(0, 50);
-  const filter = { campaignId, deptId, q };
+  const filter = parseDtrFilter(params);
   const filterQS = encodeDtrFilter(filter);
 
-  const [emps, rows, holidayRows, campaigns, departments] = await Promise.all([
+  const [emps, rows, holidayRows, campaigns, departments, costCenters] = await Promise.all([
     db
       .select({
         id: employee.id,
@@ -98,7 +98,12 @@ export default async function DtrReviewPage({
         departmentId: employee.departmentId,
       })
       .from(employee)
-      .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]))
+      .where(
+        and(
+          inArray(employee.status, ["ACTIVE", "ON_LEAVE"]),
+          ...employeeFilterConditions(filter),
+        ),
+      )
       .orderBy(employee.lastName, employee.firstName),
     db
       .select()
@@ -110,9 +115,17 @@ export default async function DtrReviewPage({
       .where(and(gte(holidayCalendar.holidayDate, w), lte(holidayCalendar.holidayDate, to))),
     db.select({ id: campaign.id, name: campaign.name }).from(campaign).orderBy(campaign.name),
     db.select({ id: department.id, name: department.name }).from(department).orderBy(department.name),
+    db.select({ id: costCenter.id, name: costCenter.name }).from(costCenter).orderBy(costCenter.name),
   ]);
 
-  const shown = emps.filter((e) => matchFilteredEmployee(filter, e));
+  const activeTotal = hasEmployeeFilter(filter)
+    ? (
+        await db
+          .select({ n: count() })
+          .from(employee)
+          .where(inArray(employee.status, ["ACTIVE", "ON_LEAVE"]))
+      )[0].n
+    : emps.length;
 
   const byEmp = new Map<number, typeof rows>();
   for (const row of rows) {
@@ -122,7 +135,7 @@ export default async function DtrReviewPage({
   }
   const holidayByDate = new Map(holidayRows.map((h) => [h.holidayDate, h.name]));
 
-  const tableRows = shown.map((emp) => {
+  const tableRows = emps.map((emp) => {
     const empRows = byEmp.get(emp.id) ?? [];
     const byDate = new Map(empRows.map((r) => [r.workDate, r]));
     const required = requiredDates({
@@ -175,9 +188,7 @@ export default async function DtrReviewPage({
         back
         title="DTR Review"
         description={`${weekLabel} · ${formatDate(w)} – ${formatDate(to)} · ${
-          filterQS
-            ? `${tableRows.length} of ${emps.length} employees`
-            : `${tableRows.length} employees`
+          hasEmployeeFilter(filter) ? `${tableRows.length} of ${activeTotal} employees` : `${tableRows.length} employees`
         } · ${approvedCount} approved`}
       >
         <div className="flex items-center gap-1">
@@ -218,7 +229,9 @@ export default async function DtrReviewPage({
           </div>
         ) : null}
 
-        <DtrFilters campaigns={campaigns} departments={departments} />
+        <div className="mb-4">
+          <EmployeeFilters campaigns={campaigns} departments={departments} costCenters={costCenters} />
+        </div>
 
         <Card>
           <CardHeader>

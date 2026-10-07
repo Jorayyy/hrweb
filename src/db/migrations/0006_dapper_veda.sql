@@ -1,0 +1,1 @@
+ALTER TABLE "payroll_run" ADD COLUMN "scope" jsonb;

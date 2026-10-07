@@ -1,11 +1,27 @@
 import Link from "next/link";
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sum } from "drizzle-orm";
 import { CircleCheckIcon, OctagonXIcon, TriangleAlertIcon } from "lucide-react";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { employee, payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
+import {
+  campaign,
+  costCenter,
+  department,
+  employee,
+  payrollPeriod,
+  payrollRun,
+  payrollRunItem,
+  type RunScope,
+} from "@/db/schema";
 import { requireRole } from "@/lib/auth";
+import {
+  employeeFilterConditions,
+  encodeDtrFilter,
+  hasEmployeeFilter,
+  parseDtrFilter,
+} from "@/lib/attendance/review";
 import { formatDate, formatPhp } from "@/lib/money";
+import { EmployeeFilters } from "@/components/employee-filters";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitButton } from "@/components/submit-button";
@@ -24,8 +40,11 @@ import {
 import { CalculateButton } from "../../calculate-button";
 import { calculateRun, createRun, deletePeriod, transitionRun } from "../../actions";
 import { periodReadiness, type Check } from "../../readiness";
+import { NewRun } from "./new-run";
 
 const PAGE_SIZE = 25;
+
+type Opt = { id: number; name: string };
 
 function CheckIcon({ check }: { check: Check }) {
   if (check.ok) return <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-600" />;
@@ -33,12 +52,33 @@ function CheckIcon({ check }: { check: Check }) {
   return <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />;
 }
 
+/** Scope rendered with option names, e.g. "Telus Support · Workforce Management". */
+function scopeText(scope: RunScope | null, opts: { campaigns: Opt[]; departments: Opt[]; costCenters: Opt[] }): string | null {
+  if (!scope) return null;
+  const names = (ids: number[] | undefined, list: Opt[]): string[] | null =>
+    ids?.length ? ids.map((id) => list.find((o) => o.id === id)?.name ?? `#${id}`) : null;
+  const parts = [
+    names(scope.campaignIds, opts.campaigns),
+    names(scope.departmentIds, opts.departments),
+    names(scope.costCenterIds, opts.costCenters),
+  ].filter((x): x is string[] => x !== null);
+  return parts.length > 0 ? parts.map((p) => p.join(", ")).join(" · ") : null;
+}
+
 export default async function PayrollPeriodPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ run?: string; page?: string; error?: string; warn?: string }>;
+  searchParams?: Promise<{
+    run?: string;
+    page?: string;
+    error?: string;
+    warn?: string;
+    campaign?: string;
+    dept?: string;
+    cc?: string;
+  }>;
 }) {
   await requireRole("ADMIN", "PAYROLL");
 
@@ -49,6 +89,10 @@ export default async function PayrollPeriodPage({
   const sp = (await searchParams) ?? {};
   const error = (sp.error ?? "").trim();
   const warn = (sp.warn ?? "").trim();
+  const filter = parseDtrFilter(sp);
+  const filterQS = encodeDtrFilter(filter);
+  const filterActive = hasEmployeeFilter(filter);
+  const filterConds = employeeFilterConditions(filter);
 
   const [period] = await db
     .select()
@@ -72,12 +116,15 @@ export default async function PayrollPeriodPage({
   const ready = readiness.ready;
   const blocking = readiness.checks.filter((c) => c.blocking && !c.ok);
 
+  const itemConds = run ? [eq(payrollRunItem.runId, run.id), ...filterConds] : [];
+
   const totalItems = run
     ? (
         await db
           .select({ n: count() })
           .from(payrollRunItem)
-          .where(eq(payrollRunItem.runId, run.id))
+          .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
+          .where(and(...itemConds))
       )[0].n
     : 0;
   const pages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -94,14 +141,54 @@ export default async function PayrollPeriodPage({
           })
           .from(payrollRunItem)
           .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
-          .where(eq(payrollRunItem.runId, run.id))
+          .where(and(...itemConds))
           .orderBy(employee.lastName, employee.firstName)
           .limit(PAGE_SIZE)
           .offset((page - 1) * PAGE_SIZE)
       : [];
 
+  const filteredTotals =
+    run && filterActive
+      ? (
+          await db
+            .select({
+              n: count(),
+              gross: sum(payrollRunItem.grossPay),
+              ded: sum(payrollRunItem.totalDeductions),
+              net: sum(payrollRunItem.netPay),
+            })
+            .from(payrollRunItem)
+            .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
+            .where(and(...itemConds))
+        )[0]
+      : null;
+
+  const [campaigns, departments, costCenters] = await Promise.all([
+    db.select({ id: campaign.id, name: campaign.name }).from(campaign).orderBy(campaign.name),
+    db.select({ id: department.id, name: department.name }).from(department).orderBy(department.name),
+    db.select({ id: costCenter.id, name: costCenter.name }).from(costCenter).orderBy(costCenter.name),
+  ]);
+  const opts = { campaigns, departments, costCenters };
+
   const registerHref = (target: number) =>
-    `/payroll/periods/${id}?run=${run?.id ?? ""}&page=${target}`;
+    `/payroll/periods/${id}?run=${run?.id ?? ""}&page=${target}${filterQS ? `&${filterQS}` : ""}`;
+
+  const footer =
+    filterActive && filteredTotals
+      ? {
+          label: `Filtered subtotal · ${filteredTotals.n} row${filteredTotals.n === 1 ? "" : "s"}`,
+          gross: Number(filteredTotals.gross ?? 0),
+          ded: Number(filteredTotals.ded ?? 0),
+          net: Number(filteredTotals.net ?? 0),
+        }
+      : run
+        ? {
+            label: "Run totals",
+            gross: run.grossTotal,
+            ded: run.deductionTotal,
+            net: run.netTotal,
+          }
+        : null;
 
   return (
     <>
@@ -207,6 +294,7 @@ export default async function PayrollPeriodPage({
                       const recalculable = ["OPEN", "CUT_OFF", "CALCULATED", "REVIEW"].includes(
                         r.status,
                       );
+                      const scope = scopeText(r.scope, opts);
                       return (
                         <TableRow
                           key={r.id}
@@ -214,11 +302,14 @@ export default async function PayrollPeriodPage({
                         >
                           <TableCell>
                             <a
-                              href={`/payroll/periods/${id}?run=${r.id}`}
+                              href={`/payroll/periods/${id}?run=${r.id}${filterQS ? `&${filterQS}` : ""}`}
                               className="font-medium hover:underline"
                             >
                               #{r.runNo}
                             </a>
+                            <span className="block max-w-44 truncate text-xs text-muted-foreground">
+                              {scope ?? "Full roster"}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <StatusBadge status={r.status} />
@@ -289,11 +380,12 @@ export default async function PayrollPeriodPage({
                   <span className="text-sm text-muted-foreground">
                     {runs.length} run{runs.length === 1 ? "" : "s"} on this cutoff
                   </span>
-                  <form action={createRun.bind(null, id)} className="inline">
-                    <SubmitButton variant="outline" size="sm">
-                      New run
-                    </SubmitButton>
-                  </form>
+                  <NewRun
+                    action={createRun.bind(null, id)}
+                    campaigns={campaigns}
+                    departments={departments}
+                    costCenters={costCenters}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -306,14 +398,24 @@ export default async function PayrollPeriodPage({
                   Register — run #{run.runNo}
                 </CardTitle>
                 <CardDescription>
-                  {totalItems} employee{totalItems === 1 ? "" : "s"} · pay date{" "}
+                  {filterActive ? `${totalItems} matching employee${totalItems === 1 ? "" : "s"}` : `${totalItems} employee${totalItems === 1 ? "" : "s"}`}
+                  {" · pay date "}
                   {formatDate(period.payDate)}
                 </CardDescription>
+                <div className="mt-3">
+                  <EmployeeFilters
+                    campaigns={campaigns}
+                    departments={departments}
+                    costCenters={costCenters}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 {items.length === 0 ? (
                   <p className="py-10 text-center text-sm text-muted-foreground">
-                    Run has no calculated rows yet — hit Calculate above.
+                    {filterActive
+                      ? "No register rows match these filters."
+                      : "Run has no calculated rows yet — hit Calculate above."}
                   </p>
                 ) : (
                   <>
@@ -380,15 +482,15 @@ export default async function PayrollPeriodPage({
                       </TableBody>
                       <TableFooter>
                         <TableRow>
-                          <TableCell colSpan={5}>Run totals</TableCell>
+                          <TableCell colSpan={5}>{footer?.label ?? "Run totals"}</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {run.grossTotal != null ? formatPhp(run.grossTotal) : "—"}
+                            {footer?.gross != null ? formatPhp(footer.gross) : "—"}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {run.deductionTotal != null ? formatPhp(run.deductionTotal) : "—"}
+                            {footer?.ded != null ? formatPhp(footer.ded) : "—"}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {run.netTotal != null ? formatPhp(run.netTotal) : "—"}
+                            {footer?.net != null ? formatPhp(footer.net) : "—"}
                           </TableCell>
                         </TableRow>
                       </TableFooter>

@@ -46,6 +46,16 @@ export const taxableClass = pgEnum("taxable_class", [
 
 export const jobStatus = pgEnum("job_status", ["PENDING", "RUNNING", "DONE", "FAILED"]);
 
+/**
+ * Optional roster scope for a run — AND-combined employee filters.
+ * Absent dimensions mean "everyone"; null scope = the whole eligible roster.
+ */
+export type RunScope = {
+  campaignIds?: number[];
+  departmentIds?: number[];
+  costCenterIds?: number[];
+};
+
 export const payrollPeriod = pgTable(
   "payroll_period",
   {
@@ -75,6 +85,8 @@ export const payrollRun = pgTable(
     grossTotal: bigint("gross_total", { mode: "number" }),
     deductionTotal: bigint("deduction_total", { mode: "number" }),
     netTotal: bigint("net_total", { mode: "number" }),
+    /** Roster this run pays — null means every eligible employee. */
+    scope: jsonb("scope").$type<RunScope | null>(),
 
     // effective-dated config snapshots — THE audit anchor
     sssScheduleId: bigint("sss_schedule_id", { mode: "number" }).notNull(),

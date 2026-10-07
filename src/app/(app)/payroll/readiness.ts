@@ -15,6 +15,12 @@ import {
 } from "@/db/schema";
 import { unreviewedOffenders } from "@/lib/attendance/review";
 import { formatDate, formatPhp } from "@/lib/money";
+import {
+  hasScope,
+  payFamilyFor,
+  runEmployeeConditions,
+  scopeLabel,
+} from "@/lib/payroll/scope";
 import { manilaDateKey } from "@/lib/time";
 
 export type Check = {
@@ -103,10 +109,17 @@ export async function periodReadiness(periodId: number, runId?: number): Promise
         : `Ends ${formatDate(period.dateTo)} — attendance may still change until then.`,
   });
 
-  const payFamily =
-    period.frequency === "WEEKLY"
-      ? (["WEEKLY", "DAILY"] as const)
-      : (["SEMI_MONTHLY", "MONTHLY"] as const);
+  const runs = await db
+    .select()
+    .from(payrollRun)
+    .where(eq(payrollRun.periodId, periodId))
+    .orderBy(desc(payrollRun.runNo));
+  const run =
+    (runId ? runs.find((r) => r.id === runId) : undefined) ??
+    runs.find((r) => r.status !== "VOID") ??
+    runs[0] ??
+    null;
+
   const emps = await db
     .select({
       id: employee.id,
@@ -115,12 +128,7 @@ export async function periodReadiness(periodId: number, runId?: number): Promise
       weeklyRestDays: employee.weeklyRestDays,
     })
     .from(employee)
-    .where(
-      and(
-        inArray(employee.status, ["ACTIVE", "ON_LEAVE"]),
-        inArray(employee.payFrequency, payFamily),
-      ),
-    );
+    .where(and(...runEmployeeConditions(period.frequency, run?.scope)));
   const dayRows =
     emps.length > 0
       ? await db
@@ -156,17 +164,6 @@ export async function periodReadiness(periodId: number, runId?: number): Promise
     fix: offenders.length > 0 ? { href: "/dtr-review", text: "Open DTR Review" } : undefined,
   });
 
-  const runs = await db
-    .select()
-    .from(payrollRun)
-    .where(eq(payrollRun.periodId, periodId))
-    .orderBy(desc(payrollRun.runNo));
-  const run =
-    (runId ? runs.find((r) => r.id === runId) : undefined) ??
-    runs.find((r) => r.status !== "VOID") ??
-    runs[0] ??
-    null;
-
   if (!run) {
     checks.push({
       key: "run-active",
@@ -197,6 +194,27 @@ export async function periodReadiness(periodId: number, runId?: number): Promise
     blocking: true,
     detail: `Run #${run.runNo}.`,
   });
+
+  if (hasScope(run.scope)) {
+    const [eligible] = await db
+      .select({ n: count() })
+      .from(employee)
+      .where(
+        and(
+          inArray(employee.status, ["ACTIVE", "ON_LEAVE"]),
+          inArray(employee.payFrequency, payFamilyFor(period.frequency)),
+        ),
+      );
+    checks.push({
+      key: "run-scope",
+      label: "Run scope",
+      ok: emps.length > 0,
+      blocking: true,
+      detail:
+        `Scoped to ${scopeLabel(run.scope)} — ${emps.length} of ${eligible?.n ?? 0} ` +
+        `eligible employee(s) on this cutoff. The rest are paid in another run.`,
+    });
+  }
 
   const calculated = CALCULATED_STATUSES.has(run.status);
   checks.push({

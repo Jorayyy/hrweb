@@ -24,6 +24,7 @@ import {
 import { requireRole } from "@/lib/auth";
 import { unreviewedOffenders } from "@/lib/attendance/review";
 import { field, isIsoDate, oneOf } from "@/lib/form";
+import { hasScope, parseRunScope, runEmployeeConditions } from "@/lib/payroll/scope";
 import { isoWeek, manilaDateKey, manilaDayOfWeek, manilaToUtc } from "@/lib/time";
 import {
   calcEmployee,
@@ -258,8 +259,9 @@ export async function createPeriod(formData: FormData): Promise<never> {
   back(id, undefined, undefined, gateError ?? undefined);
 }
 
-export async function createRun(periodId: number): Promise<never> {
+export async function createRun(periodId: number, formData: FormData): Promise<never> {
   const user = await requireRole("ADMIN", "PAYROLL");
+  const scope = parseRunScope(formData);
 
   const [period] = await db
     .select()
@@ -348,6 +350,7 @@ export async function createRun(periodId: number): Promise<never> {
       premiumMatrixEffectiveFrom: premRow.effectiveFrom,
       holidayYear: Number(period.dateFrom.slice(0, 4)),
       payruleVersion: PAYRULE_VERSION,
+      scope,
       configSnapshot: {
         generatedAt: new Date().toISOString(),
         sss,
@@ -464,11 +467,6 @@ export async function calculateRun(periodId: number, runId: number): Promise<voi
   if (!sssRow || !phicRow || !hdmfRow || birRows.length === 0 || premRows.length === 0)
     back(periodId, runId, "Run configuration is incomplete.");
 
-  const payFamily =
-    period.frequency === "WEEKLY"
-      ? (["WEEKLY", "DAILY"] as const)
-      : (["SEMI_MONTHLY", "MONTHLY"] as const);
-
   const emps = await db
     .select({
       id: employee.id,
@@ -480,15 +478,16 @@ export async function calculateRun(periodId: number, runId: number): Promise<voi
       weeklyRestDays: employee.weeklyRestDays,
     })
     .from(employee)
-    .where(
-      and(
-        inArray(employee.status, ["ACTIVE", "ON_LEAVE"]),
-        inArray(employee.payFrequency, payFamily),
-      ),
-    )
+    .where(and(...runEmployeeConditions(period.frequency, run.scope)))
     .orderBy(employee.lastName, employee.firstName);
   if (emps.length === 0)
-    back(periodId, runId, "No active employees on this cutoff's pay frequency.");
+    back(
+      periodId,
+      runId,
+      hasScope(run.scope)
+        ? "No active employees match this run's scope."
+        : "No active employees on this cutoff's pay frequency.",
+    );
 
   const ids = emps.map((e) => e.id);
   const allowanceRows = await db

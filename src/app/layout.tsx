@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { getCompany } from "@/lib/settings";
+import { applyLocaleSettings, getCompany } from "@/lib/settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,7 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  await applyLocaleSettings();
   return (
     <html
       lang="en"

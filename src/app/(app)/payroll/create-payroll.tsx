@@ -27,10 +27,20 @@ function suggestPayDate(dateTo: string, freq: string): string {
   return `${ny}-${pad(nm)}-10`;
 }
 
-export function CreatePayroll({ open, custom }: { open: Action; custom: Action }) {
+export function CreatePayroll({
+  open,
+  custom,
+  defaultFreq,
+}: {
+  open: Action;
+  custom: Action;
+  defaultFreq: string;
+}) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [mode, setMode] = useState<"standard" | "custom">("standard");
-  const [freq, setFreq] = useState<string>("SEMI_MONTHLY");
+  const [mode, setMode] = useState<"standard" | "custom">(
+    defaultFreq === "SEMI_MONTHLY" || defaultFreq === "WEEKLY" ? "standard" : "custom",
+  );
+  const [freq, setFreq] = useState<string>(defaultFreq);
   const [dateTo, setDateTo] = useState("");
   const [payDate, setPayDate] = useState("");
   const [payDirty, setPayDirty] = useState(false);

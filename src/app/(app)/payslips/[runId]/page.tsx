@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { campaign, employee, jobPosition, payrollPeriod, payrollRun, payrollRunItem } from "@/db/schema";
 import { selfEmployee } from "@/lib/auth";
 import { formatDate } from "@/lib/money";
+import { getCompany, getPayrollSettings } from "@/lib/settings";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { PayslipView, type PayslipPerson } from "@/components/payslip-view";
@@ -16,6 +17,7 @@ export default async function PayslipDetailPage({
 }) {
   const { employeeId } = await selfEmployee();
   if (!employeeId) notFound();
+  const [company, payroll] = await Promise.all([getCompany(), getPayrollSettings()]);
 
   const { runId: rawRunId } = await params;
   const runId = Number(rawRunId);
@@ -85,7 +87,13 @@ export default async function PayslipDetailPage({
       </PageHeader>
 
       <PageBody>
-        <PayslipView item={item} run={run} person={person} />
+        <PayslipView
+          item={item}
+          run={run}
+          person={person}
+          company={company}
+          note={payroll.payslipFooterNote || undefined}
+        />
       </PageBody>
     </>
   );

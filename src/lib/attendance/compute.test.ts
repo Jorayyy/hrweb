@@ -67,6 +67,26 @@ describe("computeDay", () => {
     expect(r.nightOtSeconds).toBe(0);
   });
 
+  it("absorbs lateness within the grace period and deducts only the excess", () => {
+    const early = fullPunches({ inUtc: t("08:03") });
+    expect(computeDay(DAY, DAY_SHIFT, early).lateSeconds).toBe(3 * 60);
+    expect(computeDay(DAY, DAY_SHIFT, early, { graceSeconds: 5 * 60 }).lateSeconds).toBe(0);
+
+    const late = fullPunches({ inUtc: t("08:08") });
+    expect(computeDay(DAY, DAY_SHIFT, late, { graceSeconds: 5 * 60 }).lateSeconds).toBe(3 * 60);
+  });
+
+  it("floors overtime down to the configured rounding increment", () => {
+    const punches = fullPunches({ outUtc: t("18:17") });
+    expect(computeDay(DAY, DAY_SHIFT, punches).otWorkedSeconds).toBe(77 * 60);
+    expect(
+      computeDay(DAY, DAY_SHIFT, punches, { otRoundSeconds: 15 * 60 }).otWorkedSeconds,
+    ).toBe(75 * 60);
+    expect(
+      computeDay(DAY, DAY_SHIFT, punches, { otRoundSeconds: 5 * 60 }).otWorkedSeconds,
+    ).toBe(75 * 60);
+  });
+
   it("deducts an over-long lunch from worked time and notes the variance", () => {
     const r = computeDay(DAY, DAY_SHIFT, fullPunches({ lunchInUtc: t("13:20") }));
     expect(r.workedSeconds).toBe(8 * 3600 - 20 * 60);

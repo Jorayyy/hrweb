@@ -51,7 +51,20 @@ export const NAV: readonly NavItem[] = [
       { href: "/setup/time-clock-ips", label: "Time clock IPs" },
     ],
   },
-  { href: "/settings", label: "Settings", icon: "settings", roles: ["ADMIN"] },
+  {
+    href: "/settings",
+    label: "Settings",
+    icon: "settings",
+    roles: ["ADMIN"],
+    children: [
+      { href: "/settings/company", label: "Company" },
+      { href: "/settings/locale", label: "Locale & formats" },
+      { href: "/settings/attendance", label: "Attendance rules" },
+      { href: "/settings/payroll", label: "Payroll" },
+      { href: "/settings/security", label: "Security" },
+      { href: "/settings/data", label: "Data" },
+    ],
+  },
 ];
 
 export type ResolvedNavItem = {

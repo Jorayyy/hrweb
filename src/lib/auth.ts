@@ -4,10 +4,12 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users, type UserRole } from "@/db/schema";
+import { noteSuccess } from "@/lib/lockout";
 import { verifyPassword } from "@/lib/password";
+import { getSecuritySettings } from "@/lib/settings";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: 90 * 86_400 },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
@@ -21,14 +23,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await db.query.users.findFirst({ where: eq(users.email, email) });
         if (!user || !user.isActive) return null;
         if (!(await verifyPassword(password, user.passwordHash))) return null;
+        await noteSuccess(`login:${email}`);
 
         return { id: user.id, email: user.email, name: user.name, role: user.role };
       },
     }),
   ],
   callbacks: {
-    jwt: ({ token, user }) => {
+    jwt: async ({ token, user }) => {
       if (user) token.role = user.role;
+      if (token.iat) {
+        const { sessionTimeoutDays } = await getSecuritySettings();
+        const hardExpiry = token.iat + sessionTimeoutDays * 86_400;
+        if (!token.exp || token.exp > hardExpiry) token.exp = hardExpiry;
+      }
       return token;
     },
     session: ({ session, token }) => {

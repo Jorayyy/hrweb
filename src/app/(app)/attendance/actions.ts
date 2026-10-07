@@ -13,9 +13,10 @@ import {
 import { computeDay, type PunchSet } from "@/lib/attendance/compute";
 import { requireRole } from "@/lib/auth";
 import { field, isIsoDate, oneOf, type FormState } from "@/lib/form";
+import { getAttendanceRules } from "@/lib/settings";
 import { manilaDayOfWeek, manilaToUtc, nightOverlapSeconds } from "@/lib/time";
 
-const RULE_VERSION = "att-2026.2";
+const RULE_VERSION = "att-2026.3";
 const DAY_MS = 86_400_000;
 const START_HOUR = 8;
 
@@ -142,7 +143,7 @@ export async function saveAttendanceDay(_prev: FormState, formData: FormData): P
       break2InUtc,
       outUtc: punchOutUtc,
     };
-    const c = computeDay(workDate, shift, punches);
+    const c = computeDay(workDate, shift, punches, await getAttendanceRules());
     scheduledSeconds = c.scheduledSeconds;
     // Unpaid/non-punched statuses (ABSENT, LEAVE, ...) keep schedule only —
     // punch-variance notes would wrongly flag a day nobody was expected to punch.

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { payrollPeriod, payrollRun } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/money";
+import { getPayrollSettings } from "@/lib/settings";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitButton } from "@/components/submit-button";
@@ -30,6 +31,7 @@ export default async function PayrollPage({
 
   const params = (await searchParams) ?? {};
   const error = (params.error ?? "").trim();
+  const { defaultPayFrequency } = await getPayrollSettings();
 
   const periods = await db
     .select()
@@ -55,7 +57,7 @@ export default async function PayrollPage({
   return (
     <>
       <PageHeader title="Payroll" description="Cutoff periods, runs and registers">
-        <CreatePayroll open={openPeriod} custom={createPeriod} />
+        <CreatePayroll open={openPeriod} custom={createPeriod} defaultFreq={defaultPayFrequency} />
       </PageHeader>
 
       <PageBody>

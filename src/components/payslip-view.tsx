@@ -1,5 +1,6 @@
 import type { payrollRun, payrollRunItem } from "@/db/schema";
 import { formatPhp } from "@/lib/money";
+import type { CompanySettings } from "@/lib/settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -29,16 +30,34 @@ export function PayslipView({
   item,
   run,
   person,
+  company,
+  note,
 }: {
   item: typeof payrollRunItem.$inferSelect;
   run: typeof payrollRun.$inferSelect;
   person: PayslipPerson;
+  company: CompanySettings;
+  note?: string;
 }) {
   const otHours = item.hoursOtOrd + item.hoursOtRd + item.hoursOtSpecl + item.hoursOtRh + item.hoursOtRhRd;
   const employerTotal = item.sssEr + item.sssWispEr + item.phicEr + item.hdmfEr;
+  const details = [
+    company.tin ? `TIN ${company.tin}` : null,
+    company.doleRegNo ? `DOLE reg. no. ${company.doleRegNo}` : null,
+    company.phone,
+    company.email,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <>
+      <div className="mb-4 rounded-lg border border-border bg-muted/40 px-4 py-3 text-center text-sm">
+        <p className="font-semibold">{company.name}</p>
+        {company.address ? <p className="text-muted-foreground">{company.address}</p> : null}
+        {details ? <p className="text-xs text-muted-foreground">{details}</p> : null}
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -180,6 +199,7 @@ export function PayslipView({
         Engine {item.calcEngineVer} · {item.calcAt.toISOString().slice(0, 16).replace("T", " ")}{" "}
         UTC · payrule {run.payruleVersion} · taxable pay {formatPhp(item.taxablePay)}
       </p>
+      {note ? <p className="mt-2 text-center text-xs text-muted-foreground">{note}</p> : null}
     </>
   );
 }

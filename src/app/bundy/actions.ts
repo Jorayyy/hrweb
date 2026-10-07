@@ -8,10 +8,12 @@ import { dateKeyDayOfWeek, resolveAnchorDate } from "@/lib/attendance/anchor";
 import { computeDay, type PunchSet } from "@/lib/attendance/compute";
 import { clientIp, isBundyIpAllowed } from "@/lib/bundy";
 import { field, type FormState } from "@/lib/form";
+import { isLocked, noteFailure, noteSuccess } from "@/lib/lockout";
 import { verifyPassword } from "@/lib/password";
+import { getAttendanceRules, getSecuritySettings } from "@/lib/settings";
 import { MANILA_OFFSET_MS, manilaDateKey } from "@/lib/time";
 
-const RULE_VERSION = "att-2026.2";
+const RULE_VERSION = "att-2026.3";
 const DAY_MS = 86_400_000;
 
 const SLOTS = [
@@ -149,9 +151,21 @@ export async function punch(_prev: FormState, formData: FormData): Promise<FormS
     .where(eq(employee.employeeNo, employeeNo))
     .limit(1);
 
-  if (!emp || !emp.bundyPin || !(await verifyPassword(pin, emp.bundyPin))) {
+  if (!emp) {
     return { error: "Employee no. or PIN is incorrect." };
   }
+  const lockKey = `kiosk:${emp.id}`;
+  const security = await getSecuritySettings();
+  if (await isLocked(lockKey)) {
+    return {
+      error: `Too many failed PIN attempts — try again in ${security.kioskLockoutMinutes} minutes.`,
+    };
+  }
+  if (!emp.bundyPin || !(await verifyPassword(pin, emp.bundyPin))) {
+    await noteFailure(lockKey, security.kioskLockoutAttempts, security.kioskLockoutMinutes);
+    return { error: "Employee no. or PIN is incorrect." };
+  }
+  await noteSuccess(lockKey);
   if (emp.status !== "ACTIVE" && emp.status !== "ON_LEAVE") {
     return { error: "This employee is not active." };
   }
@@ -221,7 +235,7 @@ export async function punch(_prev: FormState, formData: FormData): Promise<FormS
     return { error: "This day's DTR is approved and locked — ask HR to reopen it." };
   }
 
-  const computed = computeDay(workDate, shift, punchSet(row, slot, nowUtc));
+  const computed = computeDay(workDate, shift, punchSet(row, slot, nowUtc), await getAttendanceRules());
   const isRestDay = emp.weeklyRestDays.includes(dateKeyDayOfWeek(workDate));
   const aggregates = {
     scheduledSeconds: computed.scheduledSeconds,

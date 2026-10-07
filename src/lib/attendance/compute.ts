@@ -1,3 +1,4 @@
+import { floorToStep } from "@/lib/money";
 import { manilaToUtc, nightOverlapSeconds } from "@/lib/time";
 
 const DAY_MS = 86_400_000;
@@ -39,6 +40,11 @@ export type ComputedDay = {
   reviewNote: string | null;
 };
 
+export type DayRules = {
+  graceSeconds?: number;
+  otRoundSeconds?: number;
+};
+
 /** Manila "HH:MM" -> epoch ms anchored to workDate; rolled forward past afterMs for overnight windows. */
 function at(workDate: string, hhmm: string, afterMs: number, inclusive = false): number {
   const [y, m, d] = workDate.split("-").map(Number);
@@ -54,11 +60,15 @@ const ms = (d: Date | null): number | null => (d ? d.getTime() : null);
  * Pure timekeeping for one attendance day from (punches, shift).
  * Lunch is unpaid; AM/PM breaks are paid and counted inside worked time.
  * Break variances and missing punches are surfaced as review notes.
+ *
+ * `rules` comes from Settings — grace minutes absorb the first N minutes of
+ * lateness, OT rounding floors overtime to the increment (0 = off / exact).
  */
 export function computeDay(
   workDate: string,
   shift: ShiftTemplateInput,
   punches: PunchSet,
+  rules: DayRules = {},
 ): ComputedDay {
   const shiftStartMs = at(workDate, shift.startsAt, -1);
   const shiftEndMs = at(workDate, shift.endsAt, shiftStartMs, true);
@@ -100,14 +110,20 @@ export function computeDay(
     out !== null && inn !== null ? Math.max(0, inn - out) : 0;
   const paidBreakSeconds = Math.round((pairMs(b1Out, b1In) + pairMs(b2Out, b2In)) / 1000);
 
+  const grace = Math.max(0, rules.graceSeconds ?? 0);
+  const otRound = Math.max(0, rules.otRoundSeconds ?? 0);
+
   const lateSeconds =
-    inMs !== null ? Math.max(0, Math.round((inMs - shiftStartMs) / 1000)) : 0;
+    inMs !== null
+      ? Math.max(0, Math.round((inMs - shiftStartMs) / 1000) - grace)
+      : 0;
   const undertimeSeconds = complete
     ? Math.max(0, Math.round((shiftEndMs - (outMs as number)) / 1000))
     : 0;
-  const otWorkedSeconds = complete
+  let otWorkedSeconds = complete
     ? Math.max(0, Math.round(((outMs as number) - shiftEndMs) / 1000))
     : 0;
+  if (otRound > 0) otWorkedSeconds = floorToStep(otWorkedSeconds, otRound);
 
   const mealWindow: readonly (readonly [number, number])[] =
     lOut !== null && lIn !== null ? [[lOut, lIn]] : [];

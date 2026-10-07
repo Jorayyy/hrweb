@@ -1,4 +1,4 @@
-import { bigint, boolean, date, index, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, index, integer, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 /** All monetary values are INTEGER CENTAVOS. Rates are unitless numeric. */
 
@@ -154,6 +154,17 @@ export const employeeAllowance = pgTable(
 export const appSetting = pgTable("app_setting", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+});
+
+/**
+ * Failed credential attempts driving the login / kiosk-PIN lockout.
+ * Key is `login:<email>` or `kiosk:<employeeId>`.
+ */
+export const loginAttempt = pgTable("login_attempt", {
+  key: text("key").primaryKey(),
+  failedCount: integer("failed_count").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** IPs authorized to record punches on the web-bundy kiosk. */

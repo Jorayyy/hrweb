@@ -2,6 +2,7 @@ import "../env";
 import { db } from "../src/db";
 import { users, type UserRole } from "../src/db/schema";
 import { hashPassword } from "../src/lib/password";
+import { readSettings } from "../src/lib/settings";
 
 const ROLES: readonly string[] = ["ADMIN", "HR", "PAYROLL", "EMPLOYEE"];
 
@@ -16,6 +17,12 @@ async function main() {
   }
   if (!ROLES.includes(role)) {
     console.error(`invalid role "${role}" — expected one of ${ROLES.join(", ")}`);
+    process.exit(1);
+  }
+
+  const minLength = Number((await readSettings()).get("passwordMinLength")) || 8;
+  if (password.length < minLength) {
+    console.error(`password must be at least ${minLength} characters (Settings → Security)`);
     process.exit(1);
   }
 

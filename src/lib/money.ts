@@ -61,15 +61,43 @@ export function semiMonthly(monthlyCents: number, isSecondCutoff: boolean): numb
   return splitPeriodAmount(monthlyCents, isSecondCutoff ? 1 : 0, 2);
 }
 
-const PHP = new Intl.NumberFormat("en-PH", {
+let moneyFmt = new Intl.NumberFormat("en-PH", {
   style: "currency",
   currency: "PHP",
   minimumFractionDigits: 2,
 });
 
+let dateFmt = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "UTC" });
+
+/**
+ * Overrides the display currency / date style / group separators from saved
+ * settings. Server-only, called once per render from the root layout — no
+ * client component uses these formatters, so hydration stays consistent.
+ */
+export function setLocaleSettings(opts: {
+  currency: string;
+  dateStyle: "full" | "long" | "medium" | "short";
+  grouping: boolean;
+}): void {
+  try {
+    moneyFmt = new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: opts.currency,
+      minimumFractionDigits: 2,
+      useGrouping: opts.grouping,
+    });
+  } catch {
+    // unsupported currency code — keep the current formatter
+  }
+  dateFmt = new Intl.DateTimeFormat("en-PH", {
+    dateStyle: opts.dateStyle,
+    timeZone: "UTC",
+  });
+}
+
 /** 1234567 -> "₱12,345.67" */
 export function formatPhp(cents: number): string {
-  return PHP.format(cents / 100);
+  return moneyFmt.format(cents / 100);
 }
 
 /** "₱12,345.67" / "12345.67" -> 1234567. Returns null when unparseable. */
@@ -85,6 +113,6 @@ export function formatDate(iso: string): string {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "UTC" }).format(d);
+  return dateFmt.format(d);
 }
 

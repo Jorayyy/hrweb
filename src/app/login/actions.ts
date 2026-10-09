@@ -22,7 +22,14 @@ export async function authenticate(
     locked = email !== "" && (await isLocked(lockKey));
   } catch (cause) {
     const err = cause as Error & { cause?: Error };
-    return `DB-DEBUG: ${err.cause?.message ?? err.message}`;
+    let env = "unset";
+    try {
+      const u = new URL(process.env.DATABASE_URL ?? "");
+      env = `host=${u.hostname} db=${u.pathname}`;
+    } catch {
+      env = `raw=${JSON.stringify(process.env.DATABASE_URL ?? null).slice(0, 80)}`;
+    }
+    return `DB-DEBUG: ${err.cause?.message ?? err.message} | env=${env}`;
   }
   if (locked) {
     return `Too many failed attempts — try again in ${security.loginLockoutMinutes} minutes.`;

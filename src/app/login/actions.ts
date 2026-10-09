@@ -16,7 +16,14 @@ export async function authenticate(
   const lockKey = `login:${email}`;
 
   const security = await getSecuritySettings();
-  if (email && (await isLocked(lockKey))) {
+
+  let locked = false;
+  try {
+    locked = email !== "" && (await isLocked(lockKey));
+  } catch {
+    return "Can't reach the database right now — try again in a moment.";
+  }
+  if (locked) {
     return `Too many failed attempts — try again in ${security.loginLockoutMinutes} minutes.`;
   }
 
@@ -29,7 +36,10 @@ export async function authenticate(
   } catch (error) {
     if (error instanceof AuthError) {
       if (email) {
-        await noteFailure(lockKey, security.loginLockoutAttempts, security.loginLockoutMinutes);
+        // Lockout counter is best-effort: a failed write must not hide the login result.
+        try {
+          await noteFailure(lockKey, security.loginLockoutAttempts, security.loginLockoutMinutes);
+        } catch {}
       }
       return "Invalid email or password.";
     }

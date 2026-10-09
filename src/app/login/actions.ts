@@ -1,3 +1,5 @@
+"use server";
+
 import { AuthError } from "next-auth";
 import { signIn } from "@/lib/auth";
 import { isLocked, noteFailure } from "@/lib/lockout";
@@ -20,16 +22,8 @@ export async function authenticate(
   let locked = false;
   try {
     locked = email !== "" && (await isLocked(lockKey));
-  } catch (cause) {
-    const err = cause as Error & { cause?: Error };
-    let env = "unset";
-    try {
-      const u = new URL(process.env.DATABASE_URL ?? "");
-      env = `host=${u.hostname} db=${u.pathname}`;
-    } catch {
-      env = `raw=${JSON.stringify(process.env.DATABASE_URL ?? null).slice(0, 80)}`;
-    }
-    return `DB-DEBUG: ${err.cause?.message ?? err.message} | env=${env}`;
+  } catch {
+    return "Can't reach the database right now — try again in a moment.";
   }
   if (locked) {
     return `Too many failed attempts — try again in ${security.loginLockoutMinutes} minutes.`;

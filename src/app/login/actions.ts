@@ -20,8 +20,9 @@ export async function authenticate(
   let locked = false;
   try {
     locked = email !== "" && (await isLocked(lockKey));
-  } catch {
-    return "Can't reach the database right now — try again in a moment.";
+  } catch (cause) {
+    const err = cause as Error & { cause?: Error };
+    return `DB-DEBUG: ${err.cause?.message ?? err.message}`;
   }
   if (locked) {
     return `Too many failed attempts — try again in ${security.loginLockoutMinutes} minutes.`;

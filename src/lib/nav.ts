@@ -62,6 +62,7 @@ export const NAV: readonly NavItem[] = [
       { href: "/settings/attendance", label: "Attendance rules" },
       { href: "/settings/payroll", label: "Payroll" },
       { href: "/settings/security", label: "Security" },
+      { href: "/settings/audit", label: "Audit log" },
       { href: "/settings/data", label: "Data" },
     ],
   },

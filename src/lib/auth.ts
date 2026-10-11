@@ -1,10 +1,12 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users, type UserRole } from "@/db/schema";
 import { audit } from "@/lib/audit";
+import { clientIp } from "@/lib/bundy";
 import { noteSuccess } from "@/lib/lockout";
 import { verifyPassword } from "@/lib/password";
 import { getSecuritySettings } from "@/lib/settings";
@@ -26,6 +28,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user || !user.isActive) return null;
         if (!(await verifyPassword(password, user.passwordHash))) return null;
         await noteSuccess(`login:${email}`);
+        try {
+          const ip = clientIp(await headers());
+          if (ip) await noteSuccess(`login-ip:${ip}`);
+        } catch {}
         await audit({ actorId: user.id, actorEmail: user.email, action: "login.success", entityType: "session" });
 
         return {

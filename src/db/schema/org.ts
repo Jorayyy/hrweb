@@ -2,6 +2,7 @@ import {
   AnyPgColumn,
   bigint,
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -12,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { decryptField, encryptField } from "../../lib/crypto";
 import { shiftTemplate } from "./config";
 
 /**
@@ -50,6 +52,13 @@ export const payFrequency = pgEnum("pay_frequency", [
 export const userRole = pgEnum("user_role", ["ADMIN", "HR", "PAYROLL", "EMPLOYEE"]);
 
 export type UserRole = (typeof userRole.enumValues)[number];
+
+/** AES-256-GCM at rest (lib/crypto.ts); legacy plaintext reads pass through. */
+const encryptedText = customType<{ data: string | null; driverData: string | null }>({
+  dataType: () => "text",
+  toDriver: (value) => encryptField(value),
+  fromDriver: (value) => decryptField(value),
+});
 
 export const users = pgTable(
   "users",
@@ -160,10 +169,10 @@ export const employee = pgTable(
     /** CENTAVOS. Daily = round(base/22), hourly = round(base/176) — computed in lib/rates. */
     baseSalaryMonthly: bigint("base_salary_monthly", { mode: "number" }).notNull(),
 
-    tinNo: text("tin_no"),
-    sssNo: text("sss_no"),
-    philhealthNo: text("philhealth_no"),
-    pagibigNo: text("pagibig_no"),
+    tinNo: encryptedText("tin_no"),
+    sssNo: encryptedText("sss_no"),
+    philhealthNo: encryptedText("philhealth_no"),
+    pagibigNo: encryptedText("pagibig_no"),
     rdoCode: text("rdo_code"),
     /** scrypt hash of the web-bundy kiosk PIN. */
     bundyPin: text("bundy_pin"),

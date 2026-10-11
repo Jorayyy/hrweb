@@ -1,5 +1,15 @@
 import Link from "next/link";
 import { and, asc, count, desc, eq, gte, isNull, lte, or, sum } from "drizzle-orm";
+import {
+  AlarmClock,
+  CalendarCheck,
+  Clock,
+  TrendingUp,
+  UserMinus,
+  UserPlus,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { db } from "@/db";
 import {
   announcement,
@@ -33,6 +43,17 @@ import {
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
 }
+
+const STATUS_TONES: Record<string, string> = {
+  ACTIVE: "bg-emerald-500",
+  PREBOARDING: "bg-sky-500",
+  ON_LEAVE: "bg-amber-500",
+  REINSTATED: "bg-teal-500",
+  SUSPENDED: "bg-orange-500",
+  RETIRED: "bg-zinc-400",
+  AWOL: "bg-rose-600",
+  TERMINATED: "bg-rose-500",
+};
 
 function nowKey(): string {
   return manilaDateKey(Date.now());
@@ -166,24 +187,32 @@ export default async function Dashboard() {
         value: stats?.worked != null ? `${(Number(stats.worked) / 3600).toFixed(1)}h` : "—",
         hint: `${monthStart.slice(0, 7)} to date`,
         accent: "",
+        icon: Clock,
+        tone: "text-foreground bg-muted",
       },
       {
         label: "Late",
         value: stats?.late != null ? `${Math.round(Number(stats.late) / 60)}m` : "—",
         hint: "This month",
         accent: "text-amber-600 dark:text-amber-400",
+        icon: AlarmClock,
+        tone: "text-amber-600 bg-amber-500/10 dark:bg-amber-500/15 dark:text-amber-400",
       },
       {
         label: "Overtime",
         value: stats?.ot != null ? `${(Number(stats.ot) / 3600).toFixed(1)}h` : "—",
         hint: "This month",
         accent: "text-blue-600 dark:text-blue-400",
+        icon: TrendingUp,
+        tone: "text-blue-600 bg-blue-500/10 dark:bg-blue-500/15 dark:text-blue-400",
       },
       {
         label: "Days with record",
         value: stats ? String(stats.days) : "—",
         hint: "This month",
         accent: "text-emerald-600 dark:text-emerald-400",
+        icon: CalendarCheck,
+        tone: "text-emerald-600 bg-emerald-500/10 dark:bg-emerald-500/15 dark:text-emerald-400",
       },
     ];
 
@@ -201,14 +230,21 @@ export default async function Dashboard() {
         <PageBody>
           {me ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {statCards.map((card) => (
-                <Card key={card.label}>
+              {statCards.map(({ label, value, hint, accent, icon: Icon, tone }) => (
+                <Card key={label}>
                   <CardContent>
-                    <p className="text-xs font-medium text-muted-foreground">{card.label}</p>
-                    <p className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${card.accent}`}>
-                      {card.value}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${tone}`}
+                      >
+                        <Icon className="size-4" />
+                      </span>
+                      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                    </div>
+                    <p className={`mt-2.5 text-2xl font-semibold tracking-tight tabular-nums ${accent}`}>
+                      {value}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">{card.hint}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -399,17 +435,55 @@ export default async function Dashboard() {
   const headcount = byStatus.reduce((sumRows, r) => sumRows + r.n, 0);
   const payroll = Number(totals[0]?.payroll ?? 0);
   const peak = Math.max(1, ...byCampaign.map((r) => r.n));
+  const statusRows = [...byStatus].sort((a, b) => b.n - a.n);
+  const statusTotal = Math.max(1, headcount);
+  const statusTone = (status: string) => STATUS_TONES[status] ?? "bg-muted-foreground/40";
   const hiredRecently = await db
     .select({ n: count() })
     .from(employee)
     .where(gte(employee.dateHired, activeSince));
 
   const cards = [
-    { label: "Active headcount", value: String(active), hint: `${headcount} on file` },
-    { label: "Away today", value: String(away), hint: "Leave or suspended" },
-    { label: "Separated", value: String(left), hint: "Terminated or AWOL" },
-    { label: "Monthly base payroll", value: formatPhp(payroll), hint: "Active employees only" },
-    { label: "New hires (30d)", value: String(hiredRecently[0]?.n ?? 0), hint: activeSince },
+    {
+      label: "Active headcount",
+      value: String(active),
+      hint: `${headcount} on file`,
+      icon: Users,
+      tone: "text-emerald-600 bg-emerald-500/10 dark:bg-emerald-500/15 dark:text-emerald-400",
+      accent: "text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      label: "Away today",
+      value: String(away),
+      hint: "Leave or suspended",
+      icon: AlarmClock,
+      tone: "text-amber-600 bg-amber-500/10 dark:bg-amber-500/15 dark:text-amber-400",
+      accent: "",
+    },
+    {
+      label: "Separated",
+      value: String(left),
+      hint: "Terminated or AWOL",
+      icon: UserMinus,
+      tone: "text-rose-600 bg-rose-500/10 dark:bg-rose-500/15 dark:text-rose-400",
+      accent: "",
+    },
+    {
+      label: "Monthly base payroll",
+      value: formatPhp(payroll),
+      hint: "Active employees only",
+      icon: Wallet,
+      tone: "text-violet-600 bg-violet-500/10 dark:bg-violet-500/15 dark:text-violet-400",
+      accent: "text-violet-600 dark:text-violet-400",
+    },
+    {
+      label: "New hires (30d)",
+      value: String(hiredRecently[0]?.n ?? 0),
+      hint: activeSince,
+      icon: UserPlus,
+      tone: "text-sky-600 bg-sky-500/10 dark:bg-sky-500/15 dark:text-sky-400",
+      accent: "",
+    },
   ];
 
   return (
@@ -425,14 +499,23 @@ export default async function Dashboard() {
 
       <PageBody>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {cards.map((card) => (
-            <Card key={card.label}>
+          {cards.map(({ label, value, hint, icon: Icon, tone, accent }) => (
+            <Card key={label}>
               <CardContent>
-                <p className="text-xs font-medium text-muted-foreground">{card.label}</p>
-                <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
-                  {card.value}
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${tone}`}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                </div>
+                <p
+                  className={`mt-2.5 text-2xl font-semibold tracking-tight tabular-nums ${accent}`}
+                >
+                  {value}
                 </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{card.hint}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
               </CardContent>
             </Card>
           ))}
@@ -471,18 +554,34 @@ export default async function Dashboard() {
             <CardHeader>
               <CardTitle className="text-sm">Status breakdown</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               {byStatus.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No employees yet.</p>
               ) : (
-                [...byStatus]
-                  .sort((a, b) => b.n - a.n)
-                  .map((row) => (
-                    <div key={row.status} className="flex items-center justify-between gap-3">
-                      <StatusBadge status={row.status} />
-                      <span className="text-sm tabular-nums text-muted-foreground">{row.n}</span>
-                    </div>
-                  ))
+                <>
+                  <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+                    {statusRows.map((row) => (
+                      <div
+                        key={row.status}
+                        className={statusTone(row.status)}
+                        style={{ width: `${(row.n / statusTotal) * 100}%` }}
+                      />
+                    ))}
+                  </div>
+                  <ul className="space-y-2">
+                    {statusRows.map((row) => (
+                      <li key={row.status} className="flex items-center gap-2">
+                        <span
+                          className={`size-2.5 shrink-0 rounded-full ${statusTone(row.status)}`}
+                        />
+                        <StatusBadge status={row.status} />
+                        <span className="ml-auto text-sm tabular-nums text-muted-foreground">
+                          {row.n} · {Math.round((row.n / statusTotal) * 100)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </CardContent>
           </Card>

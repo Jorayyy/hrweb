@@ -123,7 +123,7 @@ describe("calcEmployee", () => {
     expect(item.lateSeconds).toBe(900);
   });
 
-  it("negative net is preserved and flagged REVIEW, never clamped to zero", () => {
+  it("zero-earner payslip withholds nothing and never goes negative", () => {
     const weeklyCfg: StatConfig = { ...cfg, frequency: "WEEKLY" };
     const weekly = { ...emp, payFrequency: "WEEKLY" as const };
     const item = calcEmployee(
@@ -133,9 +133,21 @@ describe("calcEmployee", () => {
     );
 
     expect(item.grossPay).toBe(0);
-    expect(item.totalDeductions).toBeGreaterThan(0);
+    expect(item.totalDeductions).toBe(0);
+    expect(item.sssEe + item.sssWispEe + item.phicEe + item.hdmfEe + item.birTax).toBe(0);
+    expect(item.netPay).toBe(0);
     expect(item.netPay).toBe(item.grossPay - item.totalDeductions);
-    expect(item.netPay).toBeLessThan(0);
+    expect(item.status).toBe("REVIEW");
+  });
+
+  it("employee with no attendance rows at all still gets a zero payslip, not a negative one", () => {
+    const weeklyCfg: StatConfig = { ...cfg, frequency: "WEEKLY" };
+    const weekly = { ...emp, payFrequency: "WEEKLY" as const };
+    const item = calcEmployee(weekly, [], weeklyCfg);
+
+    expect(item.grossPay).toBe(0);
+    expect(item.totalDeductions).toBe(0);
+    expect(item.netPay).toBe(0);
     expect(item.status).toBe("REVIEW");
   });
 });

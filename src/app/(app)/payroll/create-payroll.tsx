@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Field, selectCx } from "@/components/ui/field";
@@ -31,10 +31,12 @@ export function CreatePayroll({
   open,
   custom,
   defaultFreq,
+  trigger,
 }: {
   open: Action;
   custom: Action;
   defaultFreq: string;
+  trigger?: ReactNode;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<"standard" | "custom">(
@@ -58,7 +60,7 @@ export function CreatePayroll({
   return (
     <DialogPrimitive.Root open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogPrimitive.Trigger asChild>
-        <Button size="sm">Create payroll</Button>
+        {trigger ?? <Button size="sm">Create payroll</Button>}
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />

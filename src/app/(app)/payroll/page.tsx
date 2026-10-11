@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { desc, inArray } from "drizzle-orm";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { db } from "@/db";
 import { payrollPeriod, payrollRun } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
@@ -95,9 +95,22 @@ export default async function PayrollPage({
                   <Badge variant="secondary">{col.items.length}</Badge>
                 </div>
                 {col.items.length === 0 ? (
-                  <p className="rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
-                    None
-                  </p>
+                  <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-3 py-6 text-center">
+                    <CreatePayroll
+                      open={openPeriod}
+                      custom={createPeriod}
+                      defaultFreq={defaultPayFrequency}
+                      trigger={
+                        <Button variant="outline" size="sm">
+                          <Plus />
+                          Create period
+                        </Button>
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      No periods in this column yet
+                    </p>
+                  </div>
                 ) : (
                   col.items.map((p) => {
                     const stat = byPeriod.get(p.id);

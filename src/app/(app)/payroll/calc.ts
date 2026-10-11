@@ -242,12 +242,24 @@ export function calcEmployee(
 
   const statutoryEe = sssEe + sssWispEe + phicEe + hdmfEe;
   const taxablePay = Math.max(0, grossPay - statutoryEe - nonTaxableAllowances);
-  const birTax = emp.isMinimumWageExempt
+  const birTaxDue = emp.isMinimumWageExempt
     ? 0
     : birPeriodicTax(cfg.bir, cfg.frequency, taxablePay, cfg.cutoffIndex);
 
-  const totalDeductions = statutoryEe + birTax;
-  const rawNet = grossPay - totalDeductions;
+  // Withhold only what the pay can cover, so net can never go below zero.
+  let remaining = grossPay;
+  const take = (due: number) => {
+    const held = Math.min(due, remaining);
+    remaining -= held;
+    return held;
+  };
+  const sssEeHeld = take(sssEe);
+  const sssWispEeHeld = take(sssWispEe);
+  const phicEeHeld = take(phicEe);
+  const hdmfEeHeld = take(hdmfEe);
+  const birTax = take(birTaxDue);
+
+  const totalDeductions = grossPay - remaining;
   const totalEmployer = sssEr + sssWispEr + phicEr + hdmfEr;
 
   return {
@@ -276,17 +288,17 @@ export function calcEmployee(
     taxablePay,
     totalDeductions,
     totalEmployer,
-    netPay: rawNet,
-    sssEe,
+    netPay: remaining,
+    sssEe: sssEeHeld,
     sssEr,
-    sssWispEe,
+    sssWispEe: sssWispEeHeld,
     sssWispEr,
-    phicEe,
+    phicEe: phicEeHeld,
     phicEr,
-    hdmfEe,
+    hdmfEe: hdmfEeHeld,
     hdmfEr,
     birTax,
-    status: rawNet < 0 ? "REVIEW" : "CALCULATED",
+    status: totalDeductions < statutoryEe + birTaxDue ? "REVIEW" : "CALCULATED",
   };
 }
 

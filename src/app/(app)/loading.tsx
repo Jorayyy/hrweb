@@ -1,9 +1,20 @@
-import { Loader2Icon } from "lucide-react";
+import { PageBody } from "@/components/page-header";
+import { CardsSkeleton, PageHeaderSkeleton, PanelSkeleton, TableSkeleton } from "@/components/skeletons";
 
 export default function Loading() {
   return (
-    <div className="flex items-center justify-center py-24">
-      <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-    </div>
+    <>
+      <PageHeaderSkeleton actions={1} />
+      <PageBody>
+        <div className="space-y-4">
+          <CardsSkeleton count={4} />
+          <div className="grid gap-4 lg:grid-cols-3">
+            <PanelSkeleton className="lg:col-span-2" />
+            <PanelSkeleton />
+          </div>
+          <TableSkeleton rows={4} cols={4} title={false} />
+        </div>
+      </PageBody>
+    </>
   );
 }

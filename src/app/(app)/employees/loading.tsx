@@ -1,0 +1,13 @@
+import { PageBody } from "@/components/page-header";
+import { PageHeaderSkeleton, TableSkeleton } from "@/components/skeletons";
+
+export default function Loading() {
+  return (
+    <>
+      <PageHeaderSkeleton actions={2} />
+      <PageBody>
+        <TableSkeleton title toolbar rows={8} cols={5} />
+      </PageBody>
+    </>
+  );
+}

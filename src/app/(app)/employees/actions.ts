@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { employee, employeeCompensationHistory } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { parseEmployee, type EmployeeInput } from "@/lib/employee";
 import type { FormState } from "@/lib/form";
 import { hashPassword } from "@/lib/password";
@@ -65,6 +66,14 @@ export async function createEmployee(_prev: FormState, formData: FormData): Prom
     reason: "HIRE",
     changedBy: user.id,
   });
+  await audit({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "employee.create",
+    entityType: "employee",
+    entityId: created.id,
+    detail: { employeeNo: values.employeeNo },
+  });
   revalidatePath("/employees");
   redirect("/employees?saved=1");
 }
@@ -87,10 +96,7 @@ export async function updateEmployee(
   if (clash) return { errors: clash };
 
   const [prev] = await db
-    .select({
-      baseSalaryMonthly: employee.baseSalaryMonthly,
-      payFrequency: employee.payFrequency,
-    })
+    .select()
     .from(employee)
     .where(eq(employee.id, id))
     .limit(1);
@@ -104,6 +110,24 @@ export async function updateEmployee(
       updatedAt: new Date(),
     })
     .where(eq(employee.id, id));
+
+  if (prev) {
+    const changed: Record<string, { from: unknown; to: unknown }> = {};
+    for (const key of Object.keys(values) as (keyof typeof values)[]) {
+      if (prev[key] !== values[key]) changed[key] = { from: prev[key], to: values[key] };
+    }
+    if (bundyPin) changed.bundyPin = { from: "(set)", to: "(set)" };
+    if (Object.keys(changed).length > 0) {
+      await audit({
+        actorId: user.id,
+        actorEmail: user.email,
+        action: "employee.update",
+        entityType: "employee",
+        entityId: id,
+        detail: changed,
+      });
+    }
+  }
 
   const salaryChanged = prev && prev.baseSalaryMonthly !== values.baseSalaryMonthly;
   const freqChanged = prev && prev.payFrequency !== values.payFrequency;

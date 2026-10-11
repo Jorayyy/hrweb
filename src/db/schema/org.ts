@@ -4,6 +4,7 @@ import {
   boolean,
   date,
   index,
+  integer,
   pgEnum,
   pgTable,
   smallint,
@@ -60,6 +61,8 @@ export const users = pgTable(
     role: userRole("role").notNull().default("EMPLOYEE"),
     employeeId: bigint("employee_id", { mode: "number" }),
     isActive: boolean("is_active").notNull().default(true),
+    /** Bumped on password change to kill every live JWT session. */
+    tokenVersion: integer("token_version").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { campaign, costCenter, department, employee, jobPosition } from "@/db/schema";
 import { selfEmployee } from "@/lib/auth";
+import { maskId } from "@/lib/mask";
 import { formatDate, formatPhp } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge, humanize } from "@/components/status-badge";
@@ -137,10 +138,10 @@ export default async function ProfilePage() {
             <CardContent className="grid grid-cols-2 gap-y-2 text-sm sm:grid-cols-3">
               <Field label="Pay frequency" value={humanize(emp.payFrequency)} />
               <Field label="Monthly basic" value={formatPhp(emp.baseSalaryMonthly)} />
-              <Field label="TIN" value={emp.tinNo ?? "—"} />
-              <Field label="SSS" value={emp.sssNo ?? "—"} />
-              <Field label="PhilHealth" value={emp.philhealthNo ?? "—"} />
-              <Field label="Pag-IBIG" value={emp.pagibigNo ?? "—"} />
+              <Field label="TIN" value={maskId(emp.tinNo) ?? "—"} />
+              <Field label="SSS" value={maskId(emp.sssNo) ?? "—"} />
+              <Field label="PhilHealth" value={maskId(emp.philhealthNo) ?? "—"} />
+              <Field label="Pag-IBIG" value={maskId(emp.pagibigNo) ?? "—"} />
               <Field label="RDO" value={emp.rdoCode ?? "—"} />
             </CardContent>
           </Card>

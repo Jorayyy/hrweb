@@ -1,7 +1,7 @@
 import { and, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { attendanceDay, employee } from "@/db/schema";
-import { auth } from "@/lib/auth";
+import { sessionUser } from "@/lib/auth";
 import {
   addDays,
   mondayOf,
@@ -14,7 +14,7 @@ import { isIsoDate } from "@/lib/form";
 import { manilaDateKey } from "@/lib/time";
 
 export async function GET(req: Request) {
-  const user = (await auth())?.user;
+  const user = await sessionUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   if (user.role !== "ADMIN" && user.role !== "HR")
     return Response.json({ error: "Forbidden" }, { status: 403 });

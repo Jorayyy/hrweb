@@ -1,41 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { decode } from "next-auth/jwt";
-
-const SESSION_COOKIES = ["__Secure-authjs.session-token", "authjs.session-token"];
-
-/**
- * Cookie presence alone cannot decide /login: a stale or rotated JWT would
- * bounce /login -> / -> /login forever. Decode it so only a live session leaves.
- * Fails closed to the login page.
- */
-async function hasLiveSession(request: NextRequest): Promise<boolean> {
-  const entry = SESSION_COOKIES.map(
-    (name) => [name, request.cookies.get(name)?.value] as const,
-  ).find(([, value]) => value);
-  if (!entry) return false;
-  const [name, token] = entry;
-  try {
-    return (await decode({ token, secret: process.env.AUTH_SECRET!, salt: name })) !== null;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Optimistic gate only — the cookie is not checked on protected paths; the
- * authoritative check is `auth()` in `(app)/layout.tsx` and in every server action.
+ * authoritative check is `sessionUser()` via `requireRole` in `(app)/layout.tsx`
+ * and in every server action. /login and /bundy are passed through: the login
+ * page itself bounces already-signed-in users, so a revoked (undecodable-but-
+ * stale or tokenVersion-mismatched) cookie can always reach the form again.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = SESSION_COOKIES.some((name) => request.cookies.has(name));
+  const hasSession = ["__Secure-authjs.session-token", "authjs.session-token"].some((name) =>
+    request.cookies.has(name),
+  );
 
-  if (pathname === "/login") {
-    return (await hasLiveSession(request))
-      ? NextResponse.redirect(new URL("/", request.url))
-      : NextResponse.next();
-  }
-
-  if (pathname === "/bundy") {
+  if (pathname === "/login" || pathname === "/bundy") {
     return NextResponse.next();
   }
 

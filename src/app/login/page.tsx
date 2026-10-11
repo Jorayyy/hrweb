@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { sessionUser } from "@/lib/auth";
 import { getCompany } from "@/lib/settings";
 import { LoginForm } from "./form";
 
@@ -9,6 +11,9 @@ export default async function LoginPage({
 }) {
   const { callbackUrl } = (await searchParams) ?? {};
   const company = await getCompany();
+
+  // Revoked/stale cookies fail sessionUser() and fall through to the form.
+  if (await sessionUser()) redirect(callbackUrl?.startsWith("/") ? callbackUrl : "/");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black px-4">

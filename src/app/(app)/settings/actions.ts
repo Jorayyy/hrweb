@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { appSetting, users } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 import { field, type FormState } from "@/lib/form";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { DATE_STYLES, PAY_FREQUENCIES, getSecuritySettings } from "@/lib/settings";
@@ -40,7 +41,7 @@ function intError(name: string, min: number, max: number): FormState {
 }
 
 export async function saveCompany(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
 
   const name = field(formData, "companyName");
   if (!name) return { errors: { companyName: "Company name is required." } };
@@ -73,6 +74,14 @@ export async function saveCompany(_prev: FormState, formData: FormData): Promise
 
   await upsert("companyName", name);
   for (const [key, value] of Object.entries(contact)) await upsert(key, value);
+  await audit({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "settings.save",
+    entityType: "settings",
+    entityId: "company",
+    detail: { keys: ["companyName", ...CONTACT_KEYS] },
+  });
   revalidatePath("/", "layout");
   return { message: "Saved." };
 }
@@ -83,7 +92,7 @@ export async function saveSettings(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
   const values: Record<string, string> = {};
 
   if (card === "locale") {
@@ -138,6 +147,14 @@ export async function saveSettings(
   }
 
   for (const [key, value] of Object.entries(values)) await upsert(key, value);
+  await audit({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "settings.save",
+    entityType: "settings",
+    entityId: card,
+    detail: { keys: Object.keys(values) },
+  });
   revalidatePath("/", "layout");
   return { message: "Saved." };
 }
@@ -168,7 +185,18 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
 
   await db
     .update(users)
-    .set({ passwordHash: await hashPassword(next), updatedAt: new Date() })
+    .set({
+      passwordHash: await hashPassword(next),
+      tokenVersion: sql`token_version + 1`,
+      updatedAt: new Date(),
+    })
     .where(eq(users.id, user.id));
+  await audit({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "user.password_change",
+    entityType: "user",
+    entityId: user.id,
+  });
   return { message: "Password updated." };
 }

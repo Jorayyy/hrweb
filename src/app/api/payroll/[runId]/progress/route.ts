@@ -1,10 +1,10 @@
 import { count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { payrollJob, payrollRun } from "@/db/schema";
-import { auth } from "@/lib/auth";
+import { sessionUser } from "@/lib/auth";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ runId: string }> }) {
-  const user = (await auth())?.user;
+  const user = await sessionUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
   if (user.role !== "ADMIN" && user.role !== "PAYROLL")
     return Response.json({ error: "Forbidden" }, { status: 403 });

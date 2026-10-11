@@ -11,6 +11,15 @@ import { parseEmployee, type EmployeeInput } from "@/lib/employee";
 import type { FormState } from "@/lib/form";
 import { hashPassword } from "@/lib/password";
 import { manilaDateKey } from "@/lib/time";
+import { MAX_PHOTO_BYTES, PHOTO_TYPES, readImageFile } from "@/lib/upload";
+
+function readPhoto(formData: FormData) {
+  return readImageFile(formData.get("photo"), {
+    label: "Photo",
+    maxBytes: MAX_PHOTO_BYTES,
+    types: PHOTO_TYPES,
+  });
+}
 
 async function findClash(value: EmployeeInput, excludeId: number | null) {
   const condition = or(
@@ -50,12 +59,16 @@ export async function createEmployee(_prev: FormState, formData: FormData): Prom
   const clash = await findClash(parsed.value, null);
   if (clash) return { errors: clash };
 
+  const photo = await readPhoto(formData);
+  if (!photo.ok) return { errors: { photo: photo.error } };
+
   const { bundyPin, ...values } = parsed.value;
   const [created] = await db
     .insert(employee)
     .values({
       ...values,
       bundyPin: bundyPin ? await hashPassword(bundyPin) : null,
+      photo: photo.value,
     })
     .returning({ id: employee.id });
   await db.insert(employeeCompensationHistory).values({
@@ -95,6 +108,9 @@ export async function updateEmployee(
   const clash = await findClash(parsed.value, id);
   if (clash) return { errors: clash };
 
+  const photo = await readPhoto(formData);
+  if (!photo.ok) return { errors: { photo: photo.error } };
+
   const [prev] = await db
     .select()
     .from(employee)
@@ -106,6 +122,7 @@ export async function updateEmployee(
     .update(employee)
     .set({
       ...values,
+      ...(photo.value ? { photo: photo.value } : {}),
       ...(bundyPin ? { bundyPin: await hashPassword(bundyPin) } : {}),
       updatedAt: new Date(),
     })
@@ -117,6 +134,7 @@ export async function updateEmployee(
       if (prev[key] !== values[key]) changed[key] = { from: prev[key], to: values[key] };
     }
     if (bundyPin) changed.bundyPin = { from: "(set)", to: "(set)" };
+    if (photo.value) changed.photo = { from: prev.photo ? "(replaced)" : "(set)", to: "(set)" };
     if (Object.keys(changed).length > 0) {
       await audit({
         actorId: user.id,

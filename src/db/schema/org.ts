@@ -49,7 +49,7 @@ export const payFrequency = pgEnum("pay_frequency", [
   "DAILY",
 ]);
 
-export const userRole = pgEnum("user_role", ["ADMIN", "HR", "PAYROLL", "EMPLOYEE"]);
+export const userRole = pgEnum("user_role", ["OWNER", "ADMIN", "HR", "PAYROLL", "EMPLOYEE"]);
 
 export type UserRole = (typeof userRole.enumValues)[number];
 
@@ -183,6 +183,9 @@ export const employee = pgTable(
 
     /** 0=Sun .. 6=Sat (Postgres dow) */
     weeklyRestDays: smallint("weekly_rest_days").array().notNull().default([0]),
+
+    /** Base64 data-URI (PNG/JPG/WebP, ≤200KB); served by /api/employees/[id]/photo. */
+    photo: text("photo"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

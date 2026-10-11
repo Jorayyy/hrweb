@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { formatPhp } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge, humanize } from "@/components/status-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -150,6 +150,7 @@ export default async function EmployeesPage({
                           className="flex items-center gap-3 hover:underline"
                         >
                           <Avatar className="size-8">
+                            <AvatarImage src={`/api/employees/${r.id}/photo`} alt="" />
                             <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
                               {initials(r.firstName, r.lastName)}
                             </AvatarFallback>

@@ -6,7 +6,7 @@ import { saveSettings } from "../actions";
 import { ChangePasswordForm, SettingsForm } from "../form";
 
 export default async function SecuritySettingsPage() {
-  await requireRole("ADMIN");
+  const user = await requireRole("ADMIN");
   const security = await getSecuritySettings();
 
   return (
@@ -18,7 +18,8 @@ export default async function SecuritySettingsPage() {
       />
       <PageBody>
         <div className="grid max-w-4xl gap-4">
-          <Card>
+          {user.role === "OWNER" ? (
+            <Card>
             <CardHeader>
               <CardTitle>Policies</CardTitle>
               <CardDescription>
@@ -82,6 +83,7 @@ export default async function SecuritySettingsPage() {
               />
             </CardContent>
           </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

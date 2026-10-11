@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { appSetting, users } from "@/db/schema";
+import { appSetting, employee, users, userRole, type UserRole } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { field, type FormState } from "@/lib/form";
@@ -41,7 +42,7 @@ function intError(name: string, min: number, max: number): FormState {
 }
 
 export async function saveCompany(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await requireRole("ADMIN");
+  const user = await requireRole("OWNER");
 
   const name = field(formData, "companyName");
   if (!name) return { errors: { companyName: "Company name is required." } };
@@ -92,7 +93,7 @@ export async function saveSettings(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const user = await requireRole("ADMIN");
+  const user = card === "security" ? await requireRole("OWNER") : await requireRole("ADMIN");
   const values: Record<string, string> = {};
 
   if (card === "locale") {
@@ -199,4 +200,188 @@ export async function changePassword(_prev: FormState, formData: FormData): Prom
     entityId: user.id,
   });
   return { message: "Password updated." };
+}
+
+function notice(path: string, message: string): never {
+  redirect(`${path}?msg=${encodeURIComponent(message)}`);
+}
+
+function refuse(message: string): never {
+  redirect(`/settings/users?err=${encodeURIComponent(message)}`);
+}
+
+async function otherActiveOwnerExists(excludeId: string) {
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(eq(users.role, "OWNER"), eq(users.isActive, true), ne(users.id, excludeId)),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function createUser(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireRole("OWNER");
+
+  const email = field(formData, "email").trim().toLowerCase();
+  const name = field(formData, "name").trim();
+  const role = field(formData, "role");
+  const password = field(formData, "password");
+
+  const errors: Record<string, string> = {};
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email address.";
+  if (!name) errors.name = "Name is required.";
+  if (!(userRole.enumValues as readonly string[]).includes(role)) errors.role = "Unknown role.";
+  const { passwordMinLength } = await getSecuritySettings();
+  if (password.length < passwordMinLength) {
+    errors.password = `Use at least ${passwordMinLength} characters.`;
+  }
+  if (Object.keys(errors).length > 0) return { errors };
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  if (existing) return { errors: { email: "An account with that email already exists." } };
+
+  const [created] = await db
+    .insert(users)
+    .values({
+      email,
+      name,
+      role: role as UserRole,
+      passwordHash: await hashPassword(password),
+    })
+    .returning({ id: users.id });
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: "user.create",
+    entityType: "user",
+    entityId: created.id,
+    detail: { email, role },
+  });
+  revalidatePath("/settings/users");
+  return { message: `Account created for ${name}.` };
+}
+
+export async function setRole(userId: string, formData: FormData): Promise<void> {
+  const actor = await requireRole("OWNER");
+  const role = field(formData, "role");
+  if (!(userRole.enumValues as readonly string[]).includes(role)) refuse("Unknown role.");
+  if (userId === actor.id) refuse("You cannot change your own role.");
+  if (role !== "OWNER" && !(await otherActiveOwnerExists(userId))) {
+    refuse("At least one active owner must remain.");
+  }
+
+  await db.update(users).set({ role: role as UserRole, updatedAt: new Date() }).where(eq(users.id, userId));
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: "user.role_change",
+    entityType: "user",
+    entityId: userId,
+    detail: { role },
+  });
+  notice("/settings/users", "Role updated.");
+}
+
+export async function toggleActive(userId: string): Promise<void> {
+  const actor = await requireRole("OWNER");
+  if (userId === actor.id) refuse("You cannot deactivate your own account.");
+
+  const [target] = await db
+    .select({ role: users.role, isActive: users.isActive })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!target) refuse("Account not found.");
+  if (target.isActive && target.role === "OWNER" && !(await otherActiveOwnerExists(userId))) {
+    refuse("At least one active owner must remain.");
+  }
+
+  const isActive = !target.isActive;
+  await db
+    .update(users)
+    .set({
+      isActive,
+      // Deactivating also kills every live session for that account.
+      ...(target.isActive ? { tokenVersion: sql`token_version + 1` } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: isActive ? "user.activate" : "user.deactivate",
+    entityType: "user",
+    entityId: userId,
+  });
+  notice(
+    "/settings/users",
+    isActive ? "Account activated." : "Account deactivated.",
+  );
+}
+
+export async function resetPassword(userId: string, formData: FormData): Promise<void> {
+  const actor = await requireRole("OWNER");
+  if (userId === actor.id) refuse("Use the Security page to change your own password.");
+
+  const password = field(formData, "password");
+  const { passwordMinLength } = await getSecuritySettings();
+  if (password.length < passwordMinLength) {
+    refuse(`Password must be at least ${passwordMinLength} characters.`);
+  }
+
+  await db
+    .update(users)
+    .set({
+      passwordHash: await hashPassword(password),
+      tokenVersion: sql`token_version + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: "user.password_reset",
+    entityType: "user",
+    entityId: userId,
+  });
+  notice("/settings/users", "Password reset — their existing sessions were signed out.");
+}
+
+export async function revokeSessions(userId: string): Promise<void> {
+  const actor = await requireRole("OWNER");
+  if (userId === actor.id) refuse("You cannot revoke your own sessions.");
+
+  await db
+    .update(users)
+    .set({ tokenVersion: sql`token_version + 1`, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: "user.sessions_revoke",
+    entityType: "user",
+    entityId: userId,
+  });
+  notice("/settings/users", "Sessions revoked.");
+}
+
+export async function clearPhoto(employeeId: number): Promise<void> {
+  const actor = await requireRole("OWNER");
+
+  await db.update(employee).set({ photo: null, updatedAt: new Date() }).where(eq(employee.id, employeeId));
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: "employee.photo_clear",
+    entityType: "employee",
+    entityId: employeeId,
+  });
+  revalidatePath("/settings/photos");
+  notice("/settings/photos", "Photo cleared.");
 }

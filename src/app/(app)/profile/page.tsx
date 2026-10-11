@@ -6,6 +6,7 @@ import { maskId } from "@/lib/mask";
 import { formatDate, formatPhp } from "@/lib/money";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { StatusBadge, humanize } from "@/components/status-badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -89,6 +90,13 @@ export default async function ProfilePage() {
   return (
     <>
       <PageHeader title="My Profile" description={`${emp.employeeNo} · view only — changes go through HR`}>
+        <Avatar size="lg">
+          <AvatarImage src={`/api/employees/${emp.id}/photo`} alt="" />
+          <AvatarFallback>
+            {emp.firstName.charAt(0)}
+            {emp.lastName.charAt(0)}
+          </AvatarFallback>
+        </Avatar>
         <StatusBadge status={emp.status} />
       </PageHeader>
 

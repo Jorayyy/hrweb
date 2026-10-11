@@ -64,6 +64,13 @@
       "when": 1791734545882,
       "tag": "0008_slippery_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791759161987,
+      "tag": "0009_safe_spiral",
+      "breakpoints": true
     }
   ]
 }

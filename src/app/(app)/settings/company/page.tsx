@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CompanyForm } from "../form";
 
 export default async function CompanySettingsPage() {
-  await requireRole("ADMIN");
+  await requireRole("OWNER");
   const company = await getCompany();
 
   return (

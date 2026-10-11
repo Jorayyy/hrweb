@@ -4,14 +4,14 @@ import { users, type UserRole } from "../src/db/schema";
 import { hashPassword } from "../src/lib/password";
 import { readSettings } from "../src/lib/settings";
 
-const ROLES: readonly string[] = ["ADMIN", "HR", "PAYROLL", "EMPLOYEE"];
+const ROLES: readonly string[] = ["OWNER", "ADMIN", "HR", "PAYROLL", "EMPLOYEE"];
 
 async function main() {
   const [email, name, role, password] = process.argv.slice(2);
 
   if (!email || !name || !role || !password) {
     console.error(
-      "usage: npm run user:create -- <email> <name> <ADMIN|HR|PAYROLL|EMPLOYEE> <password>",
+      "usage: npm run user:create -- <email> <name> <OWNER|ADMIN|HR|PAYROLL|EMPLOYEE> <password>",
     );
     process.exit(1);
   }

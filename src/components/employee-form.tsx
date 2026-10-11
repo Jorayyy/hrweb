@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { cn } from "cn";
 import type { employee as employeeSchema } from "@/db/schema";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FormSection, inputCx, selectCx } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ export function EmployeeForm({
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(initial?.photo ?? null);
   const errors = state?.errors ?? {};
   const v = initial;
 
@@ -143,6 +145,30 @@ export function EmployeeForm({
             className={cx("lastName")}
             aria-invalid={invalid("lastName")}
           />
+        </Field>
+        <Field name="photo" label="Profile photo" error={errors.photo}>
+          <div className="flex items-center gap-3">
+            {photoPreview ? (
+              <Avatar size="lg" className="shrink-0">
+                <AvatarImage src={photoPreview} alt="" />
+                <AvatarFallback>
+                  {text("firstName").charAt(0)}
+                  {text("lastName").charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            ) : null}
+            <Input
+              id="photo"
+              name="photo"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className={cx("photo")}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setPhotoPreview(URL.createObjectURL(file));
+              }}
+            />
+          </div>
         </Field>
       </FormSection>
 

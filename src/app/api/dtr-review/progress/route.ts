@@ -16,7 +16,7 @@ import { manilaDateKey } from "@/lib/time";
 export async function GET(req: Request) {
   const user = await sessionUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role !== "ADMIN" && user.role !== "HR")
+  if (user.role !== "OWNER" && user.role !== "ADMIN" && user.role !== "HR")
     return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const url = new URL(req.url);

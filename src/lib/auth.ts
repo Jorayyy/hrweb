@@ -81,11 +81,11 @@ export async function sessionUser() {
   return user;
 }
 
-/** Real authorization check — `proxy.ts` only confirms a cookie exists. */
+/** Real authorization check — `proxy.ts` only confirms a cookie exists. OWNER passes every gate. */
 export async function requireRole(...roles: UserRole[]) {
   const user = await sessionUser();
   if (!user) redirect("/login");
-  if (roles.length > 0 && !roles.includes(user.role)) redirect("/");
+  if (roles.length > 0 && user.role !== "OWNER" && !roles.includes(user.role)) redirect("/");
   return user;
 }
 

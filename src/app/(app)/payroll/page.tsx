@@ -56,8 +56,8 @@ export default async function PayrollPage({
     else byPeriod.set(r.periodId, { n: 1, latest: r });
   }
 
-  const columns: { title: string; items: Period[] }[] = [
-    { title: "In progress", items: [] },
+  const columns: { title: string; items: Period[]; always?: boolean }[] = [
+    { title: "In progress", items: [], always: true },
     { title: "Posted", items: [] },
     { title: "Void", items: [] },
   ];
@@ -87,7 +87,9 @@ export default async function PayrollPage({
         </p>
 
         <div className="grid gap-4 lg:grid-cols-3">
-          {columns.map((col) => (
+          {columns
+            .filter((col) => col.always || col.items.length > 0)
+            .map((col) => (
             <Card key={col.title}>
               <CardContent className="grid gap-3">
                 <div className="flex items-center justify-between gap-2">

@@ -147,7 +147,7 @@ export function EmployeeForm({
           />
         </Field>
         <Field name="photo" label="Profile photo" error={errors.photo}>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-start gap-2">
             {photoPreview ? (
               <Avatar className="size-48 shrink-0">
                 <AvatarImage src={photoPreview} alt="" />

@@ -2,11 +2,45 @@
 
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { SearchIcon, XIcon } from "lucide-react";
+import { SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { selectCx } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Opt = { id: number; name: string };
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  allLabel,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Opt[];
+  allLabel: string;
+}) {
+  return (
+    <label className="grid gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${selectCx} cursor-pointer`}
+      >
+        <option value="">{allLabel}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 export function EmployeeFilters({
   campaigns,
@@ -36,51 +70,49 @@ export function EmployeeFilters({
   const campaign = sp.get("campaign") ?? "";
   const dept = sp.get("dept") ?? "";
   const cc = sp.get("cc") ?? "";
-  const active = Boolean(campaign || dept || cc || (sp.get("q") ?? "").trim());
+  const count = [campaign, dept, cc].filter(Boolean).length;
+  const active = Boolean(count || (sp.get("q") ?? "").trim());
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${pending ? "opacity-60" : ""}`}>
-      <select
-        aria-label="Filter by campaign"
-        value={campaign}
-        onChange={(e) => go({ campaign: e.target.value })}
-        className={`${selectCx} w-44 cursor-pointer`}
-      >
-        <option value="">All campaigns</option>
-        {campaigns.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Filter by group"
-        value={dept}
-        onChange={(e) => go({ dept: e.target.value })}
-        className={`${selectCx} w-44 cursor-pointer`}
-      >
-        <option value="">All groups</option>
-        {departments.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-      {costCenters ? (
-        <select
-          aria-label="Filter by cost center"
-          value={cc}
-          onChange={(e) => go({ cc: e.target.value })}
-          className={`${selectCx} w-44 cursor-pointer`}
-        >
-          <option value="">All cost centers</option>
-          {costCenters.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      ) : null}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="text-muted-foreground">
+            <SlidersHorizontalIcon />
+            Filters
+            {count ? (
+              <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                {count}
+              </span>
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="space-y-3">
+          <FilterSelect
+            label="Campaign"
+            value={campaign}
+            onChange={(v) => go({ campaign: v })}
+            options={campaigns}
+            allLabel="All campaigns"
+          />
+          <FilterSelect
+            label="Group"
+            value={dept}
+            onChange={(v) => go({ dept: v })}
+            options={departments}
+            allLabel="All groups"
+          />
+          {costCenters ? (
+            <FilterSelect
+              label="Cost center"
+              value={cc}
+              onChange={(v) => go({ cc: v })}
+              options={costCenters}
+              allLabel="All cost centers"
+            />
+          ) : null}
+        </PopoverContent>
+      </Popover>
       <form
         onSubmit={(e) => {
           e.preventDefault();

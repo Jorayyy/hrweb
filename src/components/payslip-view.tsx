@@ -40,6 +40,19 @@ export function PayslipView({
   company: CompanySettings;
   note?: string;
 }) {
+  if (item.grossPay === 0) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+        <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+        <p>
+          <span className="font-semibold">No earnings this cutoff.</span> No payable days were
+          recorded for this period — your DTR may be missing or not yet approved. Contact HR /
+          Payroll to have it corrected.
+        </p>
+      </div>
+    );
+  }
+
   const otHours = item.hoursOtOrd + item.hoursOtRd + item.hoursOtSpecl + item.hoursOtRh + item.hoursOtRhRd;
   const employerTotal = item.sssEr + item.sssWispEr + item.phicEr + item.hdmfEr;
   const details = [
@@ -58,17 +71,6 @@ export function PayslipView({
         {company.address ? <p className="text-muted-foreground">{company.address}</p> : null}
         {details ? <p className="text-xs text-muted-foreground">{details}</p> : null}
       </div>
-
-      {item.grossPay === 0 ? (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-          <p>
-            <span className="font-semibold">No earnings this cutoff.</span> No payable days were
-            recorded for this period — your DTR may be missing or not yet approved. Contact HR /
-            Payroll to have it corrected.
-          </p>
-        </div>
-      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

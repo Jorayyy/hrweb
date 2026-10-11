@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 import { authenticate } from "./actions";
 
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
@@ -55,9 +55,16 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 disabled:opacity-60"
+        className="w-full rounded-md bg-white px-3 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-60"
       >
-        {pending ? "Signing in…" : "Sign in"}
+        {pending ? (
+          <>
+            <Loader2Icon className="mr-2 inline size-4 animate-spin" />
+            Signing in…
+          </>
+        ) : (
+          "Sign in"
+        )}
       </button>
     </form>
   );

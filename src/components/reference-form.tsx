@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Field, selectCx } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { FormState } from "@/lib/form";
@@ -98,9 +98,9 @@ export function ReferenceForm({
         );
       })}
 
-      <Button type="submit" size="sm" disabled={pending} className="h-8">
+      <SubmitButton size="sm" className="h-8">
         {pending ? "Saving…" : submitLabel}
-      </Button>
+      </SubmitButton>
 
       {state?.error ? (
         <p className="w-full text-xs text-destructive">{state.error}</p>

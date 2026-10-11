@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { saveAttendanceDay } from "./actions";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Field, selectCx } from "@/components/ui/field";
 
@@ -130,9 +130,9 @@ export function EntryForm({
       </div>
 
       <div className="flex justify-end border-t border-border pt-4">
-        <Button type="submit" disabled={pending}>
+        <SubmitButton>
           {pending ? "Saving…" : initial ? "Update entry" : "Add entry"}
-        </Button>
+        </SubmitButton>
       </div>
     </form>
   );

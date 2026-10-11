@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useMotionValueEvent, useSpring } from "framer-motion";
+import { CheckIcon } from "lucide-react";
 
 export type Job =
   | { kind: "calc"; runId: number }
@@ -74,31 +76,76 @@ function useDoneFlash(done: boolean) {
   }, [done]);
 }
 
-function JobCard({ title, pct, detail }: { title: string; pct: number; detail: string }) {
+function useCountUp(value: number) {
+  const spring = useSpring(value, { stiffness: 150, damping: 25, mass: 0.5 });
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    spring.set(value);
+  }, [value, spring]);
+  useMotionValueEvent(spring, "change", (latest) => setDisplay(Math.round(latest)));
+
+  return display;
+}
+
+function JobCard({
+  title,
+  pct,
+  detail,
+  done,
+}: {
+  title: string;
+  pct: number;
+  detail: string;
+  done?: boolean;
+}) {
+  const shown = useCountUp(pct);
+
   return (
-    <div className="fixed right-4 bottom-4 z-50 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg">
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.97 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="fixed right-4 bottom-4 z-50 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg"
+    >
       <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-        <span className="font-medium">{title}</span>
-        <span className="tabular-nums text-muted-foreground">{pct}%</span>
+        <span className="flex min-w-0 items-center gap-1.5 font-medium">
+          {done ? (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 500, damping: 20 }}
+              className="shrink-0"
+            >
+              <CheckIcon className="size-4 text-emerald-500" />
+            </motion.span>
+          ) : null}
+          <span className="truncate">{title}</span>
+        </span>
+        <span className="tabular-nums text-muted-foreground">{shown}%</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-primary transition-all duration-300"
-          style={{ width: `${pct}%` }}
+          className={`h-full rounded-full transition-colors duration-300 ${done ? "bg-emerald-500" : "bg-primary"}`}
+          style={{ width: `${shown}%` }}
         />
       </div>
       <p className="mt-1.5 text-xs tabular-nums text-muted-foreground">{detail}</p>
-    </div>
+    </motion.div>
   );
 }
 
 export function JobProgress() {
   const job = useJob();
-  if (!job) return null;
-  return job.kind === "calc" ? (
-    <CalcProgress key={job.runId} runId={job.runId} />
-  ) : (
-    <DtrProgress key={`${job.w}|${job.f}`} job={job} />
+  return (
+    <AnimatePresence>
+      {job?.kind === "calc" ? (
+        <CalcProgress key={`calc-${job.runId}`} runId={job.runId} />
+      ) : job ? (
+        <DtrProgress key={`dtr-${job.w}|${job.f}`} job={job} />
+      ) : null}
+    </AnimatePresence>
   );
 }
 
@@ -153,6 +200,7 @@ function CalcProgress({ runId }: { runId: number }) {
     <JobCard
       title={done ? (stopped ? "Calculation stopped" : "Payroll calculated") : "Calculating payroll"}
       pct={pct}
+      done={done && !stopped}
       detail={
         done
           ? stopped
@@ -219,6 +267,7 @@ function DtrProgress({ job }: { job: Extract<Job, { kind: "dtr" }> }) {
     <JobCard
       title={done ? "DTR approved" : "Approving DTR"}
       pct={pct}
+      done={done}
       detail={
         done
           ? `${span} employee${span === 1 ? "" : "s"} approved`

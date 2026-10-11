@@ -2,11 +2,11 @@
 
 import { useActionState } from "react";
 import { cn } from "cn";
-import { Button } from "@/components/ui/button";
 import { Field, inputCx, selectCx } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/submit-button";
 import type { FormState } from "@/lib/form";
+import { useActionToast } from "@/lib/use-action-toast";
 import { changePassword, saveCompany } from "./actions";
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
@@ -25,6 +25,7 @@ export type FieldSpec = {
 
 export function SettingsForm({ fields, action }: { fields: FieldSpec[]; action: Action }) {
   const [state, formAction, pending] = useActionState(action, null);
+  useActionToast(state);
   const errors = state?.errors ?? {};
 
   return (
@@ -75,12 +76,7 @@ export function SettingsForm({ fields, action }: { fields: FieldSpec[]; action: 
         ))}
       </div>
 
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      {state?.message ? <p className="text-sm text-emerald-600">{state.message}</p> : null}
-
-      <Button type="submit" disabled={pending} size="sm">
-        {pending ? "Saving…" : "Save"}
-      </Button>
+      <SubmitButton size="sm">{pending ? "Saving…" : "Save"}</SubmitButton>
     </form>
   );
 }
@@ -95,6 +91,7 @@ export function CompanyForm({
   contact: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState(saveCompany, null);
+  useActionToast(state);
   const errors = state?.errors ?? {};
 
   return (
@@ -148,18 +145,14 @@ export function CompanyForm({
         ))}
       </div>
 
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      {state?.message ? <p className="text-sm text-emerald-600">{state.message}</p> : null}
-
-      <Button type="submit" disabled={pending} size="sm">
-        {pending ? "Saving…" : "Save"}
-      </Button>
+      <SubmitButton size="sm">{pending ? "Saving…" : "Save"}</SubmitButton>
     </form>
   );
 }
 
 export function ChangePasswordForm({ minLength }: { minLength: number }) {
   const [state, formAction] = useActionState(changePassword, null);
+  useActionToast(state);
   const errors = state?.errors ?? {};
 
   return (
@@ -176,9 +169,6 @@ export function ChangePasswordForm({ minLength }: { minLength: number }) {
         </Field>
       </div>
       <p className="text-xs text-muted-foreground">At least {minLength} characters.</p>
-
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      {state?.message ? <p className="text-sm text-emerald-600">{state.message}</p> : null}
 
       <SubmitButton size="sm">Change password</SubmitButton>
     </form>

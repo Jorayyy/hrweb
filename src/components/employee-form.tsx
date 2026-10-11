@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { cn } from "cn";
 import type { employee as employeeSchema } from "@/db/schema";
 import { Field, FormSection, inputCx, selectCx } from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import type { FormState } from "@/lib/form";
 
@@ -351,9 +351,7 @@ export function EmployeeForm({
       </section>
 
       <div className="flex justify-end border-t border-border pt-5">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : submitLabel}
-        </Button>
+        <SubmitButton>{pending ? "Saving…" : submitLabel}</SubmitButton>
       </div>
     </form>
   );

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { and, count, desc, eq, sum } from "drizzle-orm";
 import { CircleCheckIcon, OctagonXIcon, TriangleAlertIcon } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -32,7 +33,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -41,8 +41,29 @@ import { CalculateButton } from "../../calculate-button";
 import { calculateRun, createRun, deletePeriod, transitionRun } from "../../actions";
 import { periodReadiness, type Check } from "../../readiness";
 import { NewRun } from "./new-run";
+import { RegisterTable, type RegisterGroup } from "./register-table";
 
 const PAGE_SIZE = 25;
+
+const STEP_LABELS = ["Open", "Calculated", "Approved", "Posted"] as const;
+
+function stageOf(status: string): number {
+  switch (status) {
+    case "OPEN":
+    case "CUT_OFF":
+      return 0;
+    case "CALCULATING":
+    case "CALCULATED":
+    case "REVIEW":
+      return 1;
+    case "APPROVED":
+      return 2;
+    case "POSTED":
+      return 3;
+    default:
+      return -1;
+  }
+}
 
 type Opt = { id: number; name: string };
 
@@ -138,13 +159,41 @@ export default async function PayrollPeriodPage({
             firstName: employee.firstName,
             lastName: employee.lastName,
             employeeNo: employee.employeeNo,
+            campaignId: employee.campaignId,
+            campaignName: campaign.name,
           })
           .from(payrollRunItem)
           .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
+          .leftJoin(campaign, eq(employee.campaignId, campaign.id))
           .where(and(...itemConds))
           .orderBy(employee.lastName, employee.firstName)
           .limit(PAGE_SIZE)
           .offset((page - 1) * PAGE_SIZE)
+      : [];
+
+  const groupTotals: {
+    campaignId: number | null;
+    name: string | null;
+    n: number;
+    gross: string | null;
+    ded: string | null;
+    net: string | null;
+  }[] =
+    run
+      ? await db
+          .select({
+            campaignId: employee.campaignId,
+            name: campaign.name,
+            n: count(),
+            gross: sum(payrollRunItem.grossPay),
+            ded: sum(payrollRunItem.totalDeductions),
+            net: sum(payrollRunItem.netPay),
+          })
+          .from(payrollRunItem)
+          .leftJoin(employee, eq(payrollRunItem.employeeId, employee.id))
+          .leftJoin(campaign, eq(employee.campaignId, campaign.id))
+          .where(and(...itemConds))
+          .groupBy(employee.campaignId, campaign.name)
       : [];
 
   const filteredTotals =
@@ -177,18 +226,52 @@ export default async function PayrollPeriodPage({
     filterActive && filteredTotals
       ? {
           label: `Filtered subtotal · ${filteredTotals.n} row${filteredTotals.n === 1 ? "" : "s"}`,
-          gross: Number(filteredTotals.gross ?? 0),
-          ded: Number(filteredTotals.ded ?? 0),
-          net: Number(filteredTotals.net ?? 0),
+          gross: formatPhp(Number(filteredTotals.gross ?? 0)),
+          ded: formatPhp(Number(filteredTotals.ded ?? 0)),
+          net: formatPhp(Number(filteredTotals.net ?? 0)),
         }
       : run
         ? {
             label: "Run totals",
-            gross: run.grossTotal,
-            ded: run.deductionTotal,
-            net: run.netTotal,
+            gross: formatPhp(run.grossTotal ?? 0),
+            ded: formatPhp(run.deductionTotal ?? 0),
+            net: formatPhp(run.netTotal ?? 0),
           }
         : null;
+
+  const registerRows = items.map((r) => {
+    const otHours =
+      r.item.hoursOtOrd +
+      r.item.hoursOtRd +
+      r.item.hoursOtSpecl +
+      r.item.hoursOtRh +
+      r.item.hoursOtRhRd;
+    return {
+      employeeId: r.item.employeeId,
+      campaignId: r.campaignId ?? 0,
+      name: `${r.lastName}, ${r.firstName}`,
+      employeeNo: r.employeeNo ?? "",
+      days: r.item.daysWorked,
+      abs: r.item.daysAbsent,
+      ot: otHours > 0 ? otHours.toFixed(2) : "—",
+      nsd: r.item.hoursNsd > 0 ? r.item.hoursNsd.toFixed(2) : "—",
+      gross: formatPhp(r.item.grossPay),
+      ded: formatPhp(r.item.totalDeductions),
+      net: formatPhp(r.item.netPay),
+    };
+  });
+
+  const registerGroups: RegisterGroup[] = groupTotals
+    .slice()
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
+    .map((g) => ({
+      campaignId: g.campaignId ?? 0,
+      name: g.name ?? "Unassigned",
+      n: g.n,
+      gross: formatPhp(Number(g.gross ?? 0)),
+      ded: formatPhp(Number(g.ded ?? 0)),
+      net: formatPhp(Number(g.net ?? 0)),
+    }));
 
   return (
     <>
@@ -229,6 +312,64 @@ export default async function PayrollPeriodPage({
         ) : null}
 
         <div className="grid gap-4">
+          {run ? (
+            <Card>
+              <CardContent className="grid gap-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold">Run #{run.runNo} summary</h2>
+                  {scopeText(run.scope, opts) ? (
+                    <span className="truncate text-xs text-muted-foreground">
+                      {scopeText(run.scope, opts)}
+                    </span>
+                  ) : null}
+                </div>
+                <ol className="flex items-center gap-2">
+                  {STEP_LABELS.map((label, i) => {
+                    const stage = stageOf(run.status);
+                    const done = stage >= 0 && i < stage;
+                    const current = stage === i;
+                    return (
+                      <Fragment key={label}>
+                        {i > 0 ? <div className="h-px flex-1 bg-border" /> : null}
+                        <li className="flex items-center gap-1.5 text-xs whitespace-nowrap">
+                          <span
+                            className={[
+                              "flex size-4 items-center justify-center rounded-full text-[10px] font-medium",
+                              done || current
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground",
+                            ].join(" ")}
+                          >
+                            {i + 1}
+                          </span>
+                          <span className={current ? "font-medium" : "text-muted-foreground"}>
+                            {label}
+                          </span>
+                        </li>
+                      </Fragment>
+                    );
+                  })}
+                </ol>
+                <div className="grid gap-3 sm:grid-cols-4">
+                  {[
+                    { label: "Headcount", value: run.headcount != null ? String(run.headcount) : "—" },
+                    { label: "Gross", value: run.grossTotal != null ? formatPhp(run.grossTotal) : "—" },
+                    {
+                      label: "Deductions",
+                      value: run.deductionTotal != null ? formatPhp(run.deductionTotal) : "—",
+                    },
+                    { label: "Net", value: run.netTotal != null ? formatPhp(run.netTotal) : "—" },
+                  ].map((t) => (
+                    <div key={t.label} className="grid gap-0.5 rounded-lg border px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t.label}</span>
+                      <span className="font-medium tabular-nums">{t.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>Recheck before posting</CardTitle>
@@ -419,82 +560,12 @@ export default async function PayrollPeriodPage({
                   </p>
                 ) : (
                   <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead className="text-right">Days</TableHead>
-                          <TableHead className="text-right">Abs</TableHead>
-                          <TableHead className="text-right">OT h</TableHead>
-                          <TableHead className="text-right">NSD h</TableHead>
-                          <TableHead className="text-right">Gross</TableHead>
-                          <TableHead className="text-right">Deductions</TableHead>
-                          <TableHead className="text-right">Net pay</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((r) => {
-                          const otHours =
-                            r.item.hoursOtOrd +
-                            r.item.hoursOtRd +
-                            r.item.hoursOtSpecl +
-                            r.item.hoursOtRh +
-                            r.item.hoursOtRhRd;
-                          return (
-                            <TableRow key={r.item.employeeId}>
-                              <TableCell>
-                                <a
-                                  href={`/payroll/payslips/${run.id}/${r.item.employeeId}`}
-                                  className="hover:underline"
-                                >
-                                  <span className="block font-medium">
-                                    {r.lastName}, {r.firstName}
-                                  </span>
-                                  <span className="block text-xs text-muted-foreground">
-                                    {r.employeeNo}
-                                  </span>
-                                </a>
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {r.item.daysWorked}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {r.item.daysAbsent}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {otHours > 0 ? otHours.toFixed(2) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {r.item.hoursNsd > 0 ? r.item.hoursNsd.toFixed(2) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatPhp(r.item.grossPay)}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatPhp(r.item.totalDeductions)}
-                              </TableCell>
-                              <TableCell className="text-right font-medium tabular-nums">
-                                {formatPhp(r.item.netPay)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                      <TableFooter>
-                        <TableRow>
-                          <TableCell colSpan={5}>{footer?.label ?? "Run totals"}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {footer?.gross != null ? formatPhp(footer.gross) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {footer?.ded != null ? formatPhp(footer.ded) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {footer?.net != null ? formatPhp(footer.net) : "—"}
-                          </TableCell>
-                        </TableRow>
-                      </TableFooter>
-                    </Table>
+                    <RegisterTable
+                      rows={registerRows}
+                      groups={registerGroups}
+                      footer={footer}
+                      runId={run.id}
+                    />
 
                     {pages > 1 ? (
                       <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">

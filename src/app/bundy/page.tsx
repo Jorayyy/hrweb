@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { clientIp, isBundyIpAllowed } from "@/lib/bundy";
 import { getCompany } from "@/lib/settings";
+import { LoginDoodles } from "@/components/login-doodles";
 import { BundyForm, Clock } from "./form";
 
 export default async function BundyPage() {
@@ -12,23 +13,27 @@ export default async function BundyPage() {
 
   if (!allowed) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4 text-center">
-        <div className="text-4xl">⛔</div>
-        <h1 className="mt-4 text-xl font-semibold text-white">Device not authorized</h1>
-        <p className="mt-2 max-w-sm text-sm text-zinc-400">
-          This device&apos;s IP address is not registered for punching. Ask HR or the admin to
-          register it under Setup → Time clock IPs.
-        </p>
-        <Link href="/login" className="mt-6 text-sm text-zinc-500 underline hover:text-zinc-300">
-          Sign in
-        </Link>
+      <div className="relative flex min-h-screen flex-col items-center justify-center bg-black px-4 text-center">
+        <LoginDoodles />
+        <div className="relative z-10">
+          <div className="text-4xl">⛔</div>
+          <h1 className="mt-4 text-xl font-semibold text-white">Device not authorized</h1>
+          <p className="mt-2 max-w-sm text-sm text-zinc-400">
+            This device&apos;s IP address is not registered for punching. Ask HR or the admin to
+            register it under Setup → Time clock IPs.
+          </p>
+          <Link href="/login" className="mt-6 text-sm text-zinc-500 underline hover:text-zinc-300">
+            Sign in
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-10">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-black px-4 py-10">
+      <LoginDoodles />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
         <div className="flex items-center justify-center gap-2.5">
           {company.logo ? (
             // eslint-disable-next-line @next/next/no-img-element

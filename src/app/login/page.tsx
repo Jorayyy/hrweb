@@ -20,7 +20,7 @@ export default async function LoginPage({
     <div className="relative flex min-h-screen items-center justify-center bg-black px-4">
       <LoginDoodles />
       <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-center gap-2.5">
           {company.logo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={company.logo} alt={company.name} className="size-8 rounded-md object-cover" />
@@ -32,7 +32,7 @@ export default async function LoginPage({
           <div className="text-base font-semibold tracking-wide text-white">{company.name}</div>
         </div>
 
-        <p className="mt-1 text-sm text-zinc-400">Sign in to continue</p>
+        <p className="mt-1 text-center text-sm text-zinc-400">Sign in to continue</p>
 
         <LoginForm callbackUrl={callbackUrl} />
 

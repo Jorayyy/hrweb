@@ -14,7 +14,7 @@ type TourStep = {
   side?: "top" | "right" | "bottom" | "left";
 };
 
-const WAIT_FOR_ELEMENT_MS = 2500;
+const WAIT_FOR_ELEMENT_MS = 5000;
 
 function buildSteps(role: UserRole): TourStep[] {
   const isAdmin = role === "OWNER" || role === "ADMIN";
@@ -198,7 +198,7 @@ export function TutorialTour({ role }: { role: UserRole }) {
       });
 
     const navigateThen = (route: string, after: () => void) => {
-      router.push(route);
+      router.push(`${route}?tutorial=1`);
       waitForRoute(route)
         .then(() => {
           if (!cancelled) after();

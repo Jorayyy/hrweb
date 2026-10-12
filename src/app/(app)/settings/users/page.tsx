@@ -1,6 +1,6 @@
-import { desc } from "drizzle-orm";
+import { desc, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { users, userRole } from "@/db/schema";
+import { employee, users, userRole } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { PageBody, PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { selectCx } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SubmitButton } from "@/components/submit-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { resetPassword, revokeSessions, setRole, toggleActive } from "../actions";
+import { resetPassword, revokeSessions, setEmployee, setRole, toggleActive } from "../actions";
 import { CreateUserForm } from "./create-form";
 
 function titleize(role: string) {
@@ -33,12 +33,31 @@ export default async function UsersPage({
       name: users.name,
       role: users.role,
       isActive: users.isActive,
+      employeeId: users.employeeId,
       createdAt: users.createdAt,
     })
     .from(users)
     .orderBy(desc(users.createdAt));
 
   const activeOwners = rows.filter((r) => r.role === "OWNER" && r.isActive).length;
+
+  const roster = await db
+    .select({
+      id: employee.id,
+      label: employee.employeeNo,
+      name: employee.lastName,
+      firstName: employee.firstName,
+    })
+    .from(employee)
+    .where(isNull(employee.dateSeparated))
+    .orderBy(employee.employeeNo);
+
+  const linkedIds = new Set(rows.map((r) => r.employeeId).filter((v): v is number => v != null));
+  const available = roster.filter((e) => !linkedIds.has(e.id)).map((e) => ({
+    id: e.id,
+    label: `${e.label} — ${e.firstName} ${e.name}`,
+  }));
+  const empById = new Map(roster.map((e) => [e.id, e]));
 
   return (
     <>
@@ -69,7 +88,7 @@ export default async function UsersPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <CreateUserForm roles={userRole.enumValues} />
+              <CreateUserForm roles={userRole.enumValues} employees={available} />
             </CardContent>
           </Card>
 
@@ -87,6 +106,7 @@ export default async function UsersPage({
                   <TableRow>
                     <TableHead>Account</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Employee</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Reset password</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -117,6 +137,36 @@ export default async function UsersPage({
                               ))}
                             </select>
                             <SubmitButton size="xs" variant="outline" disabled={isSelf}>
+                              Set
+                            </SubmitButton>
+                          </form>
+                        </TableCell>
+                        <TableCell>
+                          <form
+                            action={setEmployee.bind(null, r.id)}
+                            className="flex items-center gap-1.5"
+                          >
+                            <select
+                              name="employeeId"
+                              defaultValue={r.employeeId ? String(r.employeeId) : ""}
+                              aria-label={`Employee link for ${r.name}`}
+                              className={`${selectCx} h-7 w-40 text-xs`}
+                            >
+                              <option value="">Not linked</option>
+                              {r.employeeId && empById.has(r.employeeId) ? (
+                                <option value={r.employeeId}>
+                                  {empById.get(r.employeeId)!.label} —{" "}
+                                  {empById.get(r.employeeId)!.firstName}{" "}
+                                  {empById.get(r.employeeId)!.name}
+                                </option>
+                              ) : null}
+                              {available.map((e) => (
+                                <option key={e.id} value={e.id}>
+                                  {e.label}
+                                </option>
+                              ))}
+                            </select>
+                            <SubmitButton size="xs" variant="outline">
                               Set
                             </SubmitButton>
                           </form>

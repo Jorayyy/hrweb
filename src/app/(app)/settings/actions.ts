@@ -228,6 +228,7 @@ export async function createUser(_prev: FormState, formData: FormData): Promise<
   const name = field(formData, "name").trim();
   const role = field(formData, "role");
   const password = field(formData, "password");
+  const employeeId = Number(field(formData, "employeeId")) || null;
 
   const errors: Record<string, string> = {};
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email address.";
@@ -236,6 +237,22 @@ export async function createUser(_prev: FormState, formData: FormData): Promise<
   const { passwordMinLength } = await getSecuritySettings();
   if (password.length < passwordMinLength) {
     errors.password = `Use at least ${passwordMinLength} characters.`;
+  }
+  if (employeeId) {
+    const [emp] = await db
+      .select({ id: employee.id })
+      .from(employee)
+      .where(eq(employee.id, employeeId))
+      .limit(1);
+    if (!emp) errors.employeeId = "Employee not found.";
+    else {
+      const [taken] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.employeeId, employeeId))
+        .limit(1);
+      if (taken) errors.employeeId = "That employee is already linked to another account.";
+    }
   }
   if (Object.keys(errors).length > 0) return { errors };
 
@@ -253,6 +270,7 @@ export async function createUser(_prev: FormState, formData: FormData): Promise<
       name,
       role: role as UserRole,
       passwordHash: await hashPassword(password),
+      employeeId,
     })
     .returning({ id: users.id });
   await audit({
@@ -261,10 +279,41 @@ export async function createUser(_prev: FormState, formData: FormData): Promise<
     action: "user.create",
     entityType: "user",
     entityId: created.id,
-    detail: { email, role },
+    detail: { email, role, employeeId },
   });
   revalidatePath("/settings/users");
   return { message: `Account created for ${name}.` };
+}
+
+export async function setEmployee(userId: string, formData: FormData): Promise<void> {
+  const actor = await requireRole("OWNER");
+  const employeeId = Number(field(formData, "employeeId")) || null;
+
+  if (employeeId) {
+    const [emp] = await db
+      .select({ id: employee.id })
+      .from(employee)
+      .where(eq(employee.id, employeeId))
+      .limit(1);
+    if (!emp) refuse("Employee not found.");
+    const [taken] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.employeeId, employeeId), ne(users.id, userId)))
+      .limit(1);
+    if (taken) refuse("That employee is already linked to another account.");
+  }
+
+  await db.update(users).set({ employeeId, updatedAt: new Date() }).where(eq(users.id, userId));
+  await audit({
+    actorId: actor.id,
+    actorEmail: actor.email,
+    action: employeeId ? "user.link_employee" : "user.unlink_employee",
+    entityType: "user",
+    entityId: userId,
+    detail: { employeeId },
+  });
+  notice("/settings/users", employeeId ? "Employee linked." : "Employee unlinked.");
 }
 
 export async function setRole(userId: string, formData: FormData): Promise<void> {

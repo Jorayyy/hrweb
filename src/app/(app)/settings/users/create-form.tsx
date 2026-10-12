@@ -7,7 +7,13 @@ import { SubmitButton } from "@/components/submit-button";
 import { useActionToast } from "@/lib/use-action-toast";
 import { createUser } from "../actions";
 
-export function CreateUserForm({ roles }: { roles: readonly string[] }) {
+export function CreateUserForm({
+  roles,
+  employees,
+}: {
+  roles: readonly string[];
+  employees: { id: number; label: string }[];
+}) {
   const [state, formAction] = useActionState(createUser, null);
   useActionToast(state);
   const errors = state?.errors ?? {};
@@ -31,6 +37,20 @@ export function CreateUserForm({ roles }: { roles: readonly string[] }) {
           {roles.map((r) => (
             <option key={r} value={r}>
               {r.charAt(0) + r.slice(1).toLowerCase()}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field
+        label="Link to employee"
+        name="employeeId"
+        error={errors.employeeId}
+      >
+        <select id="employeeId" name="employeeId" defaultValue="" className={selectCx}>
+          <option value="">Not linked</option>
+          {employees.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.label}
             </option>
           ))}
         </select>

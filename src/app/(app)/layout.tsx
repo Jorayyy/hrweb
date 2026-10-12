@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { requireRole } from "@/lib/auth";
 import { navForRole } from "@/lib/nav";
 import { getCompany } from "@/lib/settings";
 import { JobProgress } from "@/components/job-progress";
 import { Sidebar } from "@/components/sidebar";
+import { TutorialTour } from "@/components/tutorial-tour";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireRole();
@@ -17,6 +19,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       <main className="min-w-0 flex-1 bg-muted/40">{children}</main>
       <JobProgress />
+      <Suspense>
+        <TutorialTour role={user.role} />
+      </Suspense>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   Clock3,
   LayoutDashboard,
   LogOut,
+  PlayCircle,
   ScanFace,
   Settings,
   Settings2,
@@ -93,6 +94,7 @@ export function Sidebar({ items, user, company }: Props) {
                 <button
                   type="button"
                   aria-expanded={expanded}
+                  data-tour={item.label === "Setup" ? "nav-setup" : "nav-settings"}
                   onClick={() => setToggled((prev) => ({ ...prev, [item.href]: !expanded }))}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
                 >
@@ -153,9 +155,20 @@ export function Sidebar({ items, user, company }: Props) {
       </nav>
 
       <div className="border-t border-zinc-800 p-2">
+        <Link
+          href="/?tutorial=1"
+          data-tour="start-tour"
+          className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+        >
+          <PlayCircle className="size-4 shrink-0" />
+          <span className="truncate">Take a tour</span>
+        </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-zinc-900">
+            <button
+              data-tour="sidebar-user"
+              className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-zinc-900"
+            >
               <Avatar className="size-8">
                 <AvatarFallback className="bg-zinc-800 text-xs font-medium text-zinc-200">
                   {initials(user.name ?? user.email ?? "??")}

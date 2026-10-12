@@ -116,7 +116,7 @@ function buildSteps(role: UserRole): TourStep[] {
           "Work schedules per employee or campaign. Set shift patterns here; they drive how attendance, late, and undertime are computed downstream.",
       },
       {
-        route: "/setup",
+        route: "/setup/cost-centers",
         element: '[data-tour="page-header"]',
         title: "Setup",
         description:
@@ -135,7 +135,7 @@ function buildSteps(role: UserRole): TourStep[] {
           "Run payroll end to end: pick a period, generate a run, review every employee's computed pay (rate × days, overtime, deductions), then finalize. Progress is tracked live — don't close the tab mid-run.",
       },
       {
-        route: "/settings",
+        route: "/settings/security",
         element: '[data-tour="page-header"]',
         title: "Settings",
         description:
@@ -179,33 +179,41 @@ export function TutorialTour({ role }: { role: UserRole }) {
     let cancelled = false;
     const steps = buildSteps(role);
 
-    const waitForRoute = (route: string) =>
-      new Promise<void>((resolve, reject) => {
-        if (pathnameRef.current === route) {
+    const waitForRoute = (route: string, from: string) =>
+      new Promise<void>((resolve) => {
+        if (
+          pathnameRef.current === route ||
+          pathnameRef.current.startsWith(`${route}/`)
+        ) {
           resolve();
           return;
         }
+        let last = pathnameRef.current;
+        let stableSince = Date.now();
         const started = Date.now();
         const id = window.setInterval(() => {
-          if (pathnameRef.current === route) {
+          const current = pathnameRef.current;
+          if (current !== last) {
+            last = current;
+            stableSince = Date.now();
+          }
+          const arrived =
+            current === route ||
+            current.startsWith(`${route}/`) ||
+            (current !== from && Date.now() - stableSince >= 250);
+          if (arrived || Date.now() - started > 5000) {
             window.clearInterval(id);
             resolve();
-          } else if (Date.now() - started > 5000) {
-            window.clearInterval(id);
-            reject(new Error(`Navigation to ${route} timed out`));
           }
         }, 50);
       });
 
     const navigateThen = (route: string, after: () => void) => {
+      const from = pathnameRef.current;
       router.push(`${route}?tutorial=1`);
-      waitForRoute(route)
-        .then(() => {
-          if (!cancelled) after();
-        })
-        .catch(() => {
-          if (!cancelled) driverObj.destroy();
-        });
+      waitForRoute(route, from).then(() => {
+        if (!cancelled) after();
+      });
     };
 
     const driverObj = driver({

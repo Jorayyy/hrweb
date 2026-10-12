@@ -349,8 +349,14 @@ export function TutorialTour({ role }: { role: UserRole }) {
       closeBtnLabel: "Skip the tour",
       smoothScroll: true,
       overlayClickBehavior: "none",
-      stagePadding: 8,
+      overlayColor: "oklch(0.13 0.02 280)",
+      overlayOpacity: 0.5,
+      stagePadding: 10,
       stageRadius: 12,
+      onPopoverRender: (popover) => {
+        popover.nextButton.classList.add("tour-btn-next");
+        popover.previousButton.classList.add("tour-btn-prev");
+      },
       onNextClick: (_element, _step, opts) => {
         const next = steps[(opts.index ?? 0) + 1];
         if (!next) {

@@ -240,7 +240,7 @@ export default async function TimekeepingPage({
             {pageIssues.map(({ emp, days, shift }) => {
               const fields = fieldsFor(shift);
               return (
-                <Card key={emp.id}>
+                <Card key={emp.id} data-tour="tk-issues">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between gap-2 text-base">
                       <Link href={`/employees/${emp.id}`} className="truncate hover:underline">

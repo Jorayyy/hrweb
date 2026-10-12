@@ -113,7 +113,7 @@ export default async function SchedulePage({
       />
       <PageBody>
         <div className="grid gap-4">
-          <Card>
+          <Card data-tour="shift-templates">
             <CardHeader>
               <CardTitle>Shift templates</CardTitle>
               <CardDescription>
@@ -192,7 +192,7 @@ export default async function SchedulePage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="shift-assignments">
             <CardHeader>
               <CardTitle>Employee assignments</CardTitle>
               <CardDescription>Everyone needs a shift before they can punch in.</CardDescription>

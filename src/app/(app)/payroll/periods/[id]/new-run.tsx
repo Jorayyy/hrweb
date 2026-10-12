@@ -44,7 +44,7 @@ export function NewRun({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Trigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" data-tour="new-run">
           New run
         </Button>
       </DialogPrimitive.Trigger>

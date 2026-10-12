@@ -239,7 +239,7 @@ export default async function DtrReviewPage({
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <Table>
+              <Table data-tour="dtr-grid">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>

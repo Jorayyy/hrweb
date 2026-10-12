@@ -183,7 +183,7 @@ export default async function AttendancePage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="daily-log">
             <CardHeader>
               <CardTitle>Daily log</CardTitle>
               <div className="mt-3 space-y-2">

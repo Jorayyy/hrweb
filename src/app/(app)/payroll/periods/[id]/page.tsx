@@ -323,7 +323,7 @@ export default async function PayrollPeriodPage({
                     </span>
                   ) : null}
                 </div>
-                <ol className="flex items-center gap-2">
+                <ol className="flex items-center gap-2" data-tour="run-progress">
                   {STEP_LABELS.map((label, i) => {
                     const stage = stageOf(run.status);
                     const done = stage >= 0 && i < stage;
@@ -370,7 +370,7 @@ export default async function PayrollPeriodPage({
             </Card>
           ) : null}
 
-          <Card>
+          <Card data-tour="readiness">
             <CardHeader>
               <CardTitle>Recheck before posting</CardTitle>
               <CardDescription>
@@ -408,7 +408,7 @@ export default async function PayrollPeriodPage({
           </Card>
 
           {runs.length > 0 ? (
-            <Card>
+            <Card data-tour="runs-table">
               <CardHeader>
                 <CardTitle>Runs</CardTitle>
                 <CardDescription>
@@ -533,7 +533,7 @@ export default async function PayrollPeriodPage({
           ) : null}
 
           {run && period ? (
-            <Card>
+            <Card data-tour="register">
               <CardHeader>
                 <CardTitle>
                   Register — run #{run.runNo}

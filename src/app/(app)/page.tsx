@@ -27,6 +27,7 @@ import { requireRole, selfEmployee } from "@/lib/auth";
 import { formatDate, formatPhp } from "@/lib/money";
 import { manilaDateKey } from "@/lib/time";
 import { PageBody, PageHeader } from "@/components/page-header";
+import { SetupChecklist } from "@/components/setup-checklist";
 import { StatusBadge, humanize } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -498,7 +499,9 @@ export default async function Dashboard() {
       </PageHeader>
 
       <PageBody>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <SetupChecklist role={user.role} />
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {cards.map(({ label, value, hint, icon: Icon, tone, accent }) => (
             <Card key={label}>
               <CardContent>

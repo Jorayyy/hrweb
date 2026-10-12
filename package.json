@@ -17,6 +17,7 @@
     "db:seed": "tsx scripts/seed.ts && tsx scripts/seed-org.ts",
     "db:seed:org": "tsx scripts/seed-org.ts",
     "db:seed:attendance": "tsx scripts/seed-attendance.ts",
+    "db:wipe-demo": "node --env-file-if-exists=.env.local scripts/wipe-demo.mjs",
     "user:create": "tsx scripts/create-user.ts",
     "ids:encrypt": "tsx scripts/encrypt-ids.ts",
     "db:check": "node --env-file-if-exists=.env.local scripts/probe-db.mjs"

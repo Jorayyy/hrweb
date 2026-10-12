@@ -129,6 +129,29 @@
   }
 }
 
+@keyframes doodle-float {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(0) translateX(0);
+  }
+  25% {
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-14px) translateX(8px);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-4px) translateX(-10px);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) translateY(-18px) translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doodle-float,
+  [style*="doodle-float"] {
+    animation: none !important;
+  }
+}
+
 .driver-popover.tutorial-popover {
   background: oklch(0.16 0 0 / 0.94);
   background-image: linear-gradient(oklch(1 0 0 / 0.06), transparent 45%);

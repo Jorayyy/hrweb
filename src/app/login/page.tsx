@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sessionUser } from "@/lib/auth";
 import { getCompany } from "@/lib/settings";
+import { LoginDoodles } from "@/components/login-doodles";
 import { LoginForm } from "./form";
 
 export default async function LoginPage({
@@ -16,8 +17,9 @@ export default async function LoginPage({
   if (await sessionUser()) redirect(callbackUrl?.startsWith("/") ? callbackUrl : "/");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+    <div className="relative flex min-h-screen items-center justify-center bg-black px-4">
+      <LoginDoodles />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
         <div className="flex items-center gap-2.5">
           {company.logo ? (
             // eslint-disable-next-line @next/next/no-img-element

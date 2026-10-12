@@ -349,7 +349,7 @@ export function TutorialTour({ role }: { role: UserRole }) {
       closeBtnLabel: "Skip the tour",
       smoothScroll: true,
       overlayClickBehavior: "none",
-      overlayColor: "oklch(0.13 0.02 280)",
+      overlayColor: "oklch(0.13 0 0)",
       overlayOpacity: 0.5,
       stagePadding: 10,
       stageRadius: 12,

@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { announcement, bundyIp, campaign, costCenter, department, jobPosition } from "@/db/schema";
+import { announcement, bundyIp, campaign, costCenter, department, jobPosition, leaveType } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { field, intOrNull, type FormState } from "@/lib/form";
 
@@ -166,4 +167,45 @@ export async function removeAnnouncement(id: number): Promise<void> {
   await requireRole("ADMIN", "HR");
   await db.delete(announcement).where(eq(announcement.id, id));
   revalidatePath("/", "layout");
+}
+
+export async function addLeaveType(_prev: FormState, formData: FormData): Promise<FormState> {
+  await requireRole("ADMIN", "HR");
+
+  const code = field(formData, "code").toUpperCase();
+  const name = field(formData, "name");
+  const annualDays = Number(field(formData, "annualDays") || "5");
+  const errors: Record<string, string> = {};
+  const codeProblem = codeError(code);
+  if (codeProblem) errors.code = codeProblem;
+  if (!name) errors.name = "Name is required.";
+  if (!Number.isFinite(annualDays) || annualDays < 0 || annualDays > 365)
+    errors.annualDays = "Annual days must be 0–365.";
+  if (Object.keys(errors).length > 0) return { errors };
+
+  const [row] = await db
+    .insert(leaveType)
+    .values({
+      code,
+      name,
+      isPaid: formData.get("isPaid") === "on",
+      annualDays,
+    })
+    .onConflictDoNothing()
+    .returning({ id: leaveType.id });
+  if (!row) return { errors: { code: "That code already exists." } };
+
+  revalidatePath("/", "layout");
+  return null;
+}
+
+export async function removeLeaveType(id: number): Promise<never> {
+  await requireRole("ADMIN", "HR");
+  try {
+    await db.delete(leaveType).where(eq(leaveType.id, id));
+  } catch {
+    redirect("/setup/leave-types?error=Type is referenced by existing requests — mark it inactive instead.");
+  }
+  revalidatePath("/", "layout");
+  redirect("/setup/leave-types");
 }

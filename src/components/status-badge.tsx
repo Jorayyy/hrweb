@@ -9,6 +9,10 @@ const VARIANTS: Record<string, "default" | "secondary" | "outline" | "destructiv
   RETIRED: "outline",
   AWOL: "destructive",
   TERMINATED: "destructive",
+  PENDING: "secondary",
+  APPROVED: "default",
+  REJECTED: "destructive",
+  CANCELLED: "outline",
 };
 
 export function humanize(value: string): string {

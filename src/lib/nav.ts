@@ -9,7 +9,8 @@ export type IconKey =
   | "calendar"
   | "wallet"
   | "settings"
-  | "setup";
+  | "setup"
+  | "leaf";
 
 export type NavChild = {
   href: string;
@@ -34,6 +35,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/profile", label: "My Profile", icon: "users", roles: ["EMPLOYEE"] },
   { href: "/dtr", label: "My DTR", icon: "clock", roles: ["EMPLOYEE"] },
   { href: "/payslips", label: "My Payslips", icon: "wallet", roles: ["EMPLOYEE"] },
+  { href: "/leave", label: "Leaves", icon: "leaf", roles: ALL },
   { href: "/employees", label: "Employees", icon: "users", roles: HR },
   { href: "/attendance", label: "Attendance", icon: "scan", roles: HR },
   { href: "/tk", label: "TK", icon: "clock", roles: HR },
@@ -51,6 +53,7 @@ export const NAV: readonly NavItem[] = [
       { href: "/setup/departments", label: "Departments" },
       { href: "/setup/job-positions", label: "Job positions" },
       { href: "/setup/announcements", label: "Announcements" },
+      { href: "/setup/leave-types", label: "Leave types" },
       { href: "/setup/time-clock-ips", label: "Time clock IPs" },
     ],
   },

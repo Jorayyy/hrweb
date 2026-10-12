@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   Clock3,
   LayoutDashboard,
+  Leaf,
   LogOut,
   PlayCircle,
   ScanFace,
@@ -41,6 +42,7 @@ const ICONS: Record<IconKey, LucideIcon> = {
   wallet: Wallet,
   settings: Settings2,
   setup: Settings,
+  leaf: Leaf,
 };
 
 type Props = {

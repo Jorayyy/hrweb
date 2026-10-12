@@ -12,6 +12,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { holidayKind } from "./config";
+import { leaveRequest } from "./leave";
 import { users } from "./org";
 
 /** Durations are INTEGER SECONDS. Monetary values are INTEGER CENTAVOS. */
@@ -82,6 +83,8 @@ export const attendanceDay = pgTable(
     reviewNote: text("review_note"),
     reviewedBy: text("reviewed_by").references(() => users.id),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    /** Set when this day was auto-marked by an approved leave request. */
+    leaveRequestId: bigint("leave_request_id", { mode: "number" }).references(() => leaveRequest.id),
     ruleVersion: text("rule_version").notNull(),
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
   },

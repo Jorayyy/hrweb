@@ -15,6 +15,7 @@ const tables = [
   "payroll_run",
   "payroll_period",
   "attendance_day",
+  "leave_request",
   "employee_compensation_history",
   "employee_allowance",
   "employee",

@@ -59,6 +59,15 @@ function initials(name: string): string {
     .join("");
 }
 
+function companyMark(name: string): string {
+  return name
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
 export function Sidebar({ items, user, company }: Props) {
   const pathname = usePathname();
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
@@ -68,17 +77,15 @@ export function Sidebar({ items, user, company }: Props) {
       <div className="flex h-14 items-center gap-2.5 border-b border-zinc-800 px-4">
         {company.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={company.logo} alt={company.name} className="size-7 rounded-md object-cover" />
+          <img src={company.logo} alt={company.name} className="size-8 shrink-0 rounded-lg object-cover ring-1 ring-zinc-800" />
         ) : (
-          <div className="flex size-7 items-center justify-center rounded-md bg-white text-[11px] font-bold text-zinc-900">
-            HR
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-b from-zinc-100 to-zinc-300 text-[11px] font-bold uppercase tracking-wide text-zinc-900">
+            {companyMark(company.name)}
           </div>
         )}
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold leading-tight text-white">{company.name}</div>
-          <div className="truncate text-[10px] uppercase tracking-wider text-zinc-500">
-            People · Time · Pay
-          </div>
+          <div className="truncate text-[10px] font-medium uppercase tracking-wider text-zinc-500">{user.role}</div>
         </div>
       </div>
 

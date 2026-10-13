@@ -296,25 +296,44 @@ export function TutorialTour({ role }: { role: UserRole }) {
         }, 50);
       });
 
+    const waitForTarget = (selector?: string) =>
+      new Promise<void>((resolve) => {
+        if (!selector || document.querySelector(selector)) {
+          resolve();
+          return;
+        }
+        const started = Date.now();
+        const id = window.setInterval(() => {
+          if (document.querySelector(selector) || Date.now() - started > WAIT_FOR_ELEMENT_MS) {
+            window.clearInterval(id);
+            resolve();
+          }
+        }, 50);
+      });
+
     const waitForRoute = (route: string, from: string) =>
       waitForPath(from, () =>
         pathnameRef.current === route || pathnameRef.current.startsWith(`${route}/`)
       );
 
-    const navigateThen = (route: string, after: () => void) => {
+    const navigateThen = (route: string, target: string | undefined, after: () => void) => {
       const from = pathnameRef.current;
       router.push(`${route}?tutorial=1`);
-      waitForRoute(route, from).then(() => {
-        if (!cancelled) after();
-      });
+      waitForRoute(route, from)
+        .then(() => waitForTarget(target))
+        .then(() => {
+          if (!cancelled) after();
+        });
     };
 
     // shortcut: payroll deep-dive links the first period's Open href — if no
     // periods exist the sub-steps fall back to centered popovers
-    const openFirstPeriod = (after: () => void) => {
+    const openFirstPeriod = (target: string | undefined, after: () => void) => {
       const from = pathnameRef.current;
       if (pathnameRef.current.startsWith("/payroll/periods/")) {
-        after();
+        waitForTarget(target).then(() => {
+          if (!cancelled) after();
+        });
         return;
       }
       const href = document
@@ -325,9 +344,11 @@ export function TutorialTour({ role }: { role: UserRole }) {
         return;
       }
       router.push(`${href}?tutorial=1`);
-      waitForPath(from, () => pathnameRef.current.startsWith("/payroll/periods/")).then(() => {
-        if (!cancelled) after();
-      });
+      waitForPath(from, () => pathnameRef.current.startsWith("/payroll/periods/"))
+        .then(() => waitForTarget(target))
+        .then(() => {
+          if (!cancelled) after();
+        });
     };
 
     const driverObj = driver({
@@ -370,18 +391,20 @@ export function TutorialTour({ role }: { role: UserRole }) {
           return;
         }
         if (next.openPeriod) {
-          openFirstPeriod(() => driverObj.moveNext());
+          openFirstPeriod(next.element, () => driverObj.moveNext());
         } else if (next.route && next.route !== pathnameRef.current) {
-          navigateThen(next.route, () => driverObj.moveNext());
+          navigateThen(next.route, next.element, () => driverObj.moveNext());
         } else {
-          driverObj.moveNext();
+          waitForTarget(next.element).then(() => {
+            if (!cancelled) driverObj.moveNext();
+          });
         }
       },
       onPrevClick: (_element, _step, opts) => {
         const prev = steps[(opts.index ?? 0) - 1];
         if (!prev) return;
         if (prev.route && prev.route !== pathnameRef.current) {
-          navigateThen(prev.route, () => driverObj.movePrevious());
+          navigateThen(prev.route, prev.element, () => driverObj.movePrevious());
         } else {
           driverObj.movePrevious();
         }
@@ -400,7 +423,7 @@ export function TutorialTour({ role }: { role: UserRole }) {
       driverRef.current = driverObj;
       const first = steps[0];
       if (first.route && first.route !== pathnameRef.current) {
-        navigateThen(first.route, () => driverObj.drive(0));
+        navigateThen(first.route, first.element, () => driverObj.drive(0));
       } else {
         driverObj.drive(0);
       }

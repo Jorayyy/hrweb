@@ -236,3 +236,9 @@
   background: oklch(0.16 0 0) !important;
   border-color: oklch(1 0 0 / 12%) !important;
 }
+
+.driver-active-element {
+  box-shadow:
+    0 0 0 3px oklch(1 0 0 / 0.85),
+    0 0 18px 4px oklch(1 0 0 / 0.3);
+}

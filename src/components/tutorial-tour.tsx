@@ -339,6 +339,12 @@ export function TutorialTour({ role }: { role: UserRole }) {
           description: step.description,
           side: step.side,
         },
+        onHighlighted: () => {
+          // driver.js 1.9 writes overlay opacity once at SVG creation; steps
+          // without a target should dim less, so adjust the persisted SVG here.
+          const svg = document.querySelector<SVGSVGElement>("svg.driver-overlay");
+          if (svg) svg.style.opacity = step.element ? "0.7" : "0.5";
+        },
       })) satisfies DriveStep[],
       popoverClass: "tutorial-popover",
       showProgress: true,
@@ -350,7 +356,7 @@ export function TutorialTour({ role }: { role: UserRole }) {
       smoothScroll: true,
       overlayClickBehavior: "none",
       overlayColor: "oklch(0.13 0 0)",
-      overlayOpacity: 0.5,
+      overlayOpacity: 0.7,
       stagePadding: 10,
       stageRadius: 12,
       onPopoverRender: (popover) => {
